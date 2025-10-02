@@ -52,7 +52,7 @@ export default function ReceiptForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
   <div className="w-full max-w-3xl">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
           <div className="mb-6 text-center">
@@ -72,8 +72,7 @@ export default function ReceiptForm() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div className="p-6 text-center">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Click or drag a file to upload</div>
-                  <div className="mt-3 flex items-center justify-center gap-3">
+                  <div className="mt-3 flex flex-col items-center gap-2">
                     <button
                       type="button"
                       onClick={() => { /* noop; input overlay handles click */ }}
@@ -81,7 +80,9 @@ export default function ReceiptForm() {
                     >
                       Choose file
                     </button>
-                    {file && <span className="inline-block px-3 py-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs">{file.name}</span>}
+                    {file && (
+                      <span className="mt-1 block px-3 py-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs text-center">{file.name}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -124,7 +125,7 @@ export default function ReceiptForm() {
                 <div className="space-y-4">
                   <div className="flex flex-col items-center gap-1 mb-2 text-center">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Items found</h2>
-                    <div className="text-sm text-gray-500 dark:text-gray-300">Choose a category for each item. We gave our best guess on the category — please check.</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
                   </div>
 
                   <div className="flex flex-col gap-4">
