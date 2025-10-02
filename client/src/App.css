@@ -4,3 +4,10 @@
   padding: 2rem;
   text-align: center;
 }
+/* Minimal CSS — layout and theming are handled primarily by Tailwind utility classes. */
+
+/* Keep the root centered for non-Tailwind fallbacks */
+#root {
+  margin: 0 auto;
+  /* Removed padding and text-align for a cleaner card appearance */
+}
