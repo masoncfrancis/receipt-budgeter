@@ -14,13 +14,8 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props)
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-sm text-gray-300">Kind</label>
-            <input
-              className="mt-1 w-full bg-transparent border border-gray-700 rounded px-3 py-2 text-gray-100"
-              value={item.kind}
-              onChange={(e) => onChange(item.id, { kind: e.target.value })}
-              placeholder="e.g., bread, milk"
-            />
+            <label className="text-sm text-gray-300">Likely item</label>
+            <div className="mt-1 w-full bg-transparent border border-gray-700 rounded px-3 py-2 text-gray-100">{item.kind || 'Unknown'}</div>
           </div>
 
           <div>
