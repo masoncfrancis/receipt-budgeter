@@ -53,16 +53,16 @@ export default function ReceiptForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl">
+  <div className="w-full max-w-3xl">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
           <div className="mb-6 text-center">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Track Receipts</h1>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Upload a photo of your receipt and we'll help you put it in the budget</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* File input card */}
-            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Receipt Photo <span className="text-red-500">*</span></label>
               <div className="relative rounded-md overflow-hidden border border-dashed border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-800/40">
                 <input
@@ -89,9 +89,9 @@ export default function ReceiptForm() {
 
             {/* Actions */}
             <div className="flex items-center justify-center">
-              <div className="w-full max-w-lg flex flex-col sm:flex-row gap-3">
+              <div className="w-full max-w-xl flex flex-col sm:flex-row gap-4">
                 <button
-                  className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
+                    className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
                   onClick={() => { setFile(null); setItems(null) }}
                 >
                   Reset
@@ -101,7 +101,17 @@ export default function ReceiptForm() {
                   onClick={onSubmit}
                   disabled={!file || loading}
                 >
-                  {loading ? 'Looking at your receipt...' : 'Check the Receipt'}
+                  {loading ? (
+                    <span className="flex items-center justify-center" aria-hidden="true">
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
+                      <span className="sr-only">Processing</span>
+                    </span>
+                  ) : (
+                    'Check the Receipt'
+                  )}
                 </button>
               </div>
             </div>
@@ -112,21 +122,21 @@ export default function ReceiptForm() {
 
               {items && (
                 <div className="space-y-4">
-                  <div className="flex flex-col items-start gap-1 mb-2">
+                  <div className="flex flex-col items-center gap-1 mb-2 text-center">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Items found</h2>
-                    <div className="text-sm text-gray-500 dark:text-gray-300">Choose a category for each item before saving. We gave our best guess — please check.</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-300">Choose a category for each item. We gave our best guess on the category — please check.</div>
                   </div>
 
-                  <div className="flex flex-col gap-3">
-                    {items.map((it) => (
-                      <div key={it.id} className="p-3 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
+                  <div className="flex flex-col gap-4">
+                      {items.map((it) => (
+                        <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
                         <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} />
                       </div>
                     ))}
                   </div>
 
                   <div className="flex items-center justify-center mt-2">
-                    <div className="w-full max-w-md flex flex-col sm:flex-row gap-3">
+                    <div className="w-full max-w-lg flex flex-col sm:flex-row gap-4">
                       <button
                         className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
                         onClick={() => setItems(null)}

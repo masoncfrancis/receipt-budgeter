@@ -14,12 +14,12 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props)
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-sm text-gray-300">Likely item</label>
+            <label className="text-sm text-gray-300">We think this is</label>
             <div className="mt-1 w-full bg-transparent border border-gray-700 rounded px-3 py-2 text-gray-100">{item.kind || 'Unknown'}</div>
           </div>
 
           <div>
-            <label className="text-sm text-gray-300">Budget</label>
+            <label className="text-sm text-gray-300">Budget Category</label>
             <select
               className="mt-1 w-full bg-transparent border border-gray-700 rounded px-3 py-2 text-gray-100"
               value={item.budgetCategory}
