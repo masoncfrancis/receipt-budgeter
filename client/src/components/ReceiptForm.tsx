@@ -124,7 +124,7 @@ export default function ReceiptForm() {
               {items && (
                 <div className="space-y-4">
                   <div className="flex flex-col items-center gap-1 mb-2 text-center">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Items found</h2>
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Here's what we found</h2>
                     <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
                   </div>
 
