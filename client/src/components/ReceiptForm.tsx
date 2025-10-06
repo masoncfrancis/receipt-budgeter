@@ -56,7 +56,7 @@ export default function ReceiptForm() {
   <div className="w-full max-w-3xl">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Track Receipts</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Receipt Reader</h1>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Upload a photo of your receipt and we'll help you put it in the budget</p>
           </div>
 
