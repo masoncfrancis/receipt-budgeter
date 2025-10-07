@@ -18,8 +18,9 @@ export const { OidcProvider, useOidc, getOidc } =
             //audience: "https://my-app.my-company.com/api"
         }),
         decodedIdTokenSchema: z.object({
-            preferred_username: z.string(),
-            name: z.string()
+            // some identity providers omit preferred_username or name; accept either as optional
+            preferred_username: z.string().optional(),
+            name: z.string().optional()
             //email: z.string().email().optional()
         })
     }));

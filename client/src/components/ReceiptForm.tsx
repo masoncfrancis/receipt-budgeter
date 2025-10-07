@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
+import { useOidc } from '../oidc'
 import type { ParsedItem, MockResponse } from './types'
 import ReceiptItemRow from './ReceiptItemRow'
 import { v4 as uuidv4 } from 'uuid'
@@ -19,6 +20,7 @@ const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
 }
 
 export default function ReceiptForm() {
+  const { decodedIdToken, logout, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
   const [file, setFile] = useState<File | null>(null)
   const [items, setItems] = useState<ParsedItem[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -55,6 +57,22 @@ export default function ReceiptForm() {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
   <div className="w-full max-w-3xl">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+          {isUserLoggedIn && decodedIdToken && (
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center space-x-2 justify-end w-full">
+                <span className="px-3 py-1 rounded-lg border-1 font-semibold text-sm transition-colors duration-300 text-gray-800 dark:text-white">
+                  {decodedIdToken.name ?? decodedIdToken.preferred_username ?? 'User'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => logout?.({ redirectTo: window.location.origin })}
+                  className="px-3 py-1 rounded-lg bg-red-500 disabled hover:bg-red-600 text-white font-semibold text-sm transition-colors duration-200">
+                  Log Out
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mb-6 text-center">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Receipt Reader</h1>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Upload a photo of your receipt and we'll help you put it in the budget</p>
