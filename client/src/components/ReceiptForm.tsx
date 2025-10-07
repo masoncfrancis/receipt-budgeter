@@ -58,18 +58,10 @@ export default function ReceiptForm() {
   <div className="w-full max-w-3xl">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
           {isUserLoggedIn && decodedIdToken && (
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-2 justify-end w-full">
-                <span className="px-3 py-1 rounded-lg border-1 font-semibold text-sm transition-colors duration-300 text-gray-800 dark:text-white">
-                  {decodedIdToken.name ?? decodedIdToken.preferred_username ?? 'User'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => logout?.({ redirectTo: window.location.origin })}
-                  className="px-3 py-1 rounded-lg bg-red-500 disabled hover:bg-red-600 text-white font-semibold text-sm transition-colors duration-200">
-                  Log Out
-                </button>
-              </div>
+            <div className="flex justify-end items-center mb-4">
+              <span className="px-3 py-1 rounded-lg border-1 font-semibold text-sm transition-colors duration-300 text-gray-800 dark:text-white">
+                {decodedIdToken.name ?? decodedIdToken.preferred_username ?? 'User'}
+              </span>
             </div>
           )}
 
