@@ -61,7 +61,7 @@ export default function ReceiptForm() {
             <div className="flex justify-end items-center mb-4">
               <span className="px-3 py-1 rounded-lg border-1 font-semibold text-sm transition-colors duration-300 text-gray-800 dark:text-white">
                 {decodedIdToken.name ?? decodedIdToken.preferred_username ?? 'User'}
-              </span>
+              </spangit >
             </div>
           )}
 
