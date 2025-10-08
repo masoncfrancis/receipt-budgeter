@@ -6,6 +6,9 @@ import { v4 as uuidv4 } from 'uuid'
 
 const MOCK_BUDGETS = ['groceries', 'transport', 'entertainment', 'utilities', 'dining', 'other']
 
+// Placeholder payment methods for the whole receipt (will come from backend later)
+const PAYMENT_OPTIONS = ['Visa **** 1234', 'Mastercard **** 5678', 'Cash', 'Amex **** 9012', 'Other']
+
 // Mock API that finds items on a receipt (friendly wording)
 const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
   // Simulate an OCR/API call delay
@@ -20,9 +23,10 @@ const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
 }
 
 export default function ReceiptForm() {
-  const { decodedIdToken, logout, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
+  const { decodedIdToken, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
   const [file, setFile] = useState<File | null>(null)
   const [items, setItems] = useState<ParsedItem[] | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -49,8 +53,9 @@ export default function ReceiptForm() {
 
   const handleSave = () => {
     // For now just log the final payload — in real app we'd POST this to server
-    console.log('Saving items', items)
-    alert('Items saved (mock). Check console for payload.')
+    const payload = { paymentMethod: paymentMethod || null, items }
+    console.log('Saving receipt', payload)
+    alert(`Receipt saved (mock). Payment: ${paymentMethod || 'not selected'}. Check console for payload.`)
   }
 
   return (
@@ -136,6 +141,23 @@ export default function ReceiptForm() {
                   <div className="flex flex-col items-center gap-1 mb-2 text-center">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Here's what we found</h2>
                     <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
+                  </div>
+
+                  {/* Receipt-level payment method selection */}
+                  <div className="flex items-center justify-center">
+                    <div className="w-full max-w-md">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
+                      >
+                        <option value="">Select payment</option>
+                        {PAYMENT_OPTIONS.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-4">
