@@ -5,6 +5,14 @@ import LoginLanding from './components/LoginLanding'
 import { OidcProvider, useOidc } from './oidc'
 import { useEffect, useState } from 'react'
 import { getOidc } from './oidc'
+// Vite environment flag to allow anonymous (no-login) mode.
+// Set VITE_ALLOW_ANONYMOUS=1 or VITE_ALLOW_ANONYMOUS=true to enable.
+const VITE_ALLOW_ANONYMOUS =
+    typeof import.meta !== 'undefined' &&
+    Boolean(
+        (import.meta as any).env?.VITE_VITE_ALLOW_ANONYMOUS === '1' ||
+            (import.meta as any).env?.VITE_VITE_ALLOW_ANONYMOUS === 'true'
+    )
 
 function InnerApp() {
     // useOidc typically exposes `isUserLoggedIn`. Rely on that directly.
@@ -20,9 +28,14 @@ function App() {
         console.log('[App] location:', location.href)
     }, [])
 
-    // ensure OIDC has initialized before we render the rest of the app
+    // If anonymous mode is enabled we skip OIDC initialization entirely.
     const [oidcReady, setOidcReady] = useState(false)
     useEffect(() => {
+        if (VITE_ALLOW_ANONYMOUS) {
+            console.log('[App] anonymous mode enabled; skipping OIDC')
+            setOidcReady(true)
+            return
+        }
         let mounted = true
         ;(async () => {
             try {
@@ -36,6 +49,19 @@ function App() {
         })()
         return () => { mounted = false }
     }, [])
+
+    // If anonymous mode is enabled, render the app without the OIDC provider
+    if (VITE_ALLOW_ANONYMOUS) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+                <div className="w-full max-w-md">
+                    <div className="space-y-4">
+                        <ReceiptForm />
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <OidcProvider fallback={<LoadingScreen />}>

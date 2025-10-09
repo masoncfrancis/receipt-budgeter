@@ -1,8 +1,34 @@
-import { createReactOidc } from "oidc-spa/react";
-import { z } from "zod";
+import * as React from 'react';
+import { createReactOidc } from 'oidc-spa/react';
+import { z } from 'zod';
 
-export const { OidcProvider, useOidc, getOidc } =
-    createReactOidc(async () => ({
+// Vite environment flag to allow anonymous (no-login) mode.
+const ALLOW_ANONYMOUS =
+    typeof import.meta !== 'undefined' &&
+    Boolean(
+        (import.meta as any).env?.VITE_ALLOW_ANONYMOUS === '1' ||
+            (import.meta as any).env?.VITE_ALLOW_ANONYMOUS === 'true'
+    );
+
+// We'll export these names; assign them conditionally below.
+let OidcProvider: any;
+let useOidc: any;
+let getOidc: any;
+
+if (ALLOW_ANONYMOUS) {
+    // Lightweight fake implementations for anonymous mode.
+    OidcProvider = ({ children }) => React.createElement(React.Fragment, null, children);
+    useOidc = () => ({ isUserLoggedIn: true, user: { name: 'Anonymous', sub: 'anonymous' } });
+    getOidc = async () => ({
+        isUserLoggedIn: true,
+        user: { name: 'Anonymous', sub: 'anonymous' },
+        signIn: async () => {},
+        signOut: async () => {},
+        // keep getTokens so fetchWithAuth can call it safely
+        getTokens: async () => ({ accessToken: '' })
+    });
+} else {
+    const created = createReactOidc(async () => ({
         issuerUri: import.meta.env.VITE_OIDC_ISSUER,
         clientId: import.meta.env.VITE_OIDC_CLIENT_ID,
         /**
@@ -14,7 +40,7 @@ export const { OidcProvider, useOidc, getOidc } =
         // autoLogin: true,
         //scopes: ["profile", "email", "api://my-app/access_as_user"],
         extraQueryParams: () => ({
-            ui_locales: "en" // Keycloak login/register page language
+            ui_locales: 'en' // Keycloak login/register page language
             //audience: "https://my-app.my-company.com/api"
         }),
         decodedIdTokenSchema: z.object({
@@ -25,18 +51,22 @@ export const { OidcProvider, useOidc, getOidc } =
         })
     }));
 
-export const fetchWithAuth: typeof fetch = async (
-    input,
-    init
-) => {
+    OidcProvider = created.OidcProvider;
+    useOidc = created.useOidc;
+    getOidc = created.getOidc;
+}
+
+export { OidcProvider, useOidc, getOidc };
+
+export const fetchWithAuth: typeof fetch = async (input, init) => {
     const oidc = await getOidc();
-    
+
     if (oidc.isUserLoggedIn) {
-        const { accessToken } = await oidc.getTokens();
+        const { accessToken } = (await oidc.getTokens()) || {};
 
         (init ??= {}).headers = {
             ...init.headers,
-            Authorization: `Bearer ${accessToken}`
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
         };
     }
 
