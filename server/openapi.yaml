@@ -1,0 +1,235 @@
+openapi: 3.2.0
+info:
+  title: Receipt Reader API
+  version: 1.0.0
+  description: >-
+    Minimal OpenAPI spec for the Receipt Reader service. Provides endpoints
+    for retrieving budget information, analyzing receipt images (file upload),
+    and submitting receipts (JSON transactions).
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /getBudgetInformation:
+    get:
+      summary: Get budget categories and accounts
+      operationId: getBudgetInformation
+      responses:
+        '200':
+          description: Budget categories and accounts returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetInformationResponse'
+              examples:
+                example-1:
+                  summary: Example response
+                  value:
+                    categories:
+                      - id: food
+                        name: Food & Dining
+                      - id: transport
+                        name: Transportation
+                    accounts:
+                      - id: checking
+                        name: Checking Account
+                      - id: credit-card
+                        name: Credit Card
+
+  /analyzeReceipt:
+    post:
+      summary: Analyze an uploaded receipt image
+      operationId: analyzeReceipt
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Receipt image file to analyze
+              required:
+                - file
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeReceiptResponse'
+              examples:
+                example-1:
+                  summary: Typical analysis
+                  value:
+                    merchantName: "Corner Grocery"
+                    merchantLocation: "123 Main St, Springfield"
+                    receiptDate: "2025-10-01"
+                    subtotal: 42.5
+                    taxAmount: 3.4
+                    totalPrice: 45.9
+                    items:
+                      - name: "Milk"
+                        itemKind: "grocery"
+                        budgetCategoryGuess: "food"
+                        price: 3.5
+                      - name: "Bread"
+                        itemKind: "grocery"
+                        budgetCategoryGuess: "food"
+                        price: 2.5
+
+  /submitReceipt:
+    post:
+      summary: Submit parsed receipt transactions
+      operationId: submitReceipt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitReceiptRequest'
+            examples:
+              example-1:
+                summary: Submit two transactions
+                value:
+                  transactions:
+                    - name: "Milk"
+                      itemKind: "grocery"
+                      budgetCategoryGuess: "food"
+                      price: 3.5
+                    - name: "Bus Ticket"
+                      itemKind: "transport"
+                      budgetCategoryGuess: "transport"
+                      price: 2.75
+      responses:
+        '200':
+          description: Receipt submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  id:
+                    type: string
+                required:
+                  - ok
+              examples:
+                example-1:
+                  value:
+                    ok: true
+                    id: "abc123"
+
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    BudgetInformationResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+      required:
+        - categories
+        - accounts
+
+    AnalyzeItem:
+      type: object
+      properties:
+        name:
+          type: string
+        itemKind:
+          type: string
+        budgetCategoryGuess:
+          type: string
+        price:
+          type: number
+          format: float
+      required:
+        - name
+        - price
+
+    AnalyzeReceiptResponse:
+      type: object
+      properties:
+        merchantName:
+          type: string
+        merchantLocation:
+          type: string
+        receiptDate:
+          type: string
+          format: date
+        subtotal:
+          type: number
+          format: float
+        taxAmount:
+          type: number
+          format: float
+        totalPrice:
+          type: number
+          format: float
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyzeItem'
+      required:
+        - totalPrice
+        - items
+
+    Transaction:
+      type: object
+      properties:
+        name:
+          type: string
+        itemKind:
+          type: string
+        budgetCategoryGuess:
+          type: string
+        price:
+          type: number
+          format: float
+      required:
+        - name
+        - price
+
+    SubmitReceiptRequest:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+      required:
+        - transactions
+
+  securitySchemes: {}
