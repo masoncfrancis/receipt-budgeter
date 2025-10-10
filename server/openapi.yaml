@@ -26,7 +26,7 @@ paths:
                 example-1:
                   summary: Example response
                   value:
-                    categories:
+                    availableCategories:
                       - id: food
                         name: Food & Dining
                       - id: transport
@@ -66,19 +66,19 @@ paths:
                   summary: Typical analysis
                   value:
                     merchantName: "Corner Grocery"
-                    merchantLocation: "123 Main St, Springfield"
+                    merchantLocation: "123 Woodward Ave, Detroit"
                     receiptDate: "2025-10-01"
                     subtotal: 42.5
                     taxAmount: 3.4
                     totalPrice: 45.9
                     items:
-                      - name: "Milk"
-                        itemKind: "grocery"
-                        budgetCategoryGuess: "food"
+                      - name: "2% Reduced Fat"
+                        itemKind: "milk"
+                        budgetCategoryGuess: "grocery"
                         price: 3.5
-                      - name: "Bread"
-                        itemKind: "grocery"
-                        budgetCategoryGuess: "food"
+                      - name: "Whole Grain Loaf"
+                        itemKind: "bread"
+                        budgetCategoryGuess: "grocery"
                         price: 2.5
 
   /submitReceipt:
@@ -92,18 +92,22 @@ paths:
             schema:
               $ref: '#/components/schemas/SubmitReceiptRequest'
             examples:
-              example-1:
-                summary: Submit two transactions
-                value:
-                  transactions:
-                    - name: "Milk"
-                      itemKind: "grocery"
-                      budgetCategoryGuess: "food"
-                      price: 3.5
-                    - name: "Bus Ticket"
-                      itemKind: "transport"
-                      budgetCategoryGuess: "transport"
-                      price: 2.75
+                example-1:
+                  summary: Submit a single receipt split across categories
+                  value:
+                    accountId: "checking"
+                    merchantName: "Corner Grocery"
+                    receiptDate: "2025-10-01"
+                    subtotal: 42.5
+                    tax: 3.4
+                    total: 45.9
+                    splits:
+                      - categoryId: food
+                        amount: 30.0
+                        description: "Groceries"
+                      - categoryId: household
+                        amount: 15.9
+                        description: "Household supplies (includes tax)"
       responses:
         '200':
           description: Receipt submitted successfully
@@ -151,7 +155,7 @@ components:
     BudgetInformationResponse:
       type: object
       properties:
-        categories:
+        availableCategories:
           type: array
           items:
             $ref: '#/components/schemas/Category'
@@ -160,7 +164,7 @@ components:
           items:
             $ref: '#/components/schemas/Account'
       required:
-        - categories
+        - availableCategories
         - accounts
 
     AnalyzeItem:
@@ -221,15 +225,50 @@ components:
       required:
         - name
         - price
+    Split:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          description: Budget category id (should match an available category)
+        amount:
+          type: number
+          format: float
+          description: Amount (including tax portion) allocated to this category
+        description:
+          type: string
+          description: Optional free-text description of the split
+      required:
+        - categoryId
+        - amount
 
     SubmitReceiptRequest:
       type: object
       properties:
-        transactions:
+        accountId:
+          type: string
+          description: Id of the account this multi-category transaction belongs to
+        merchantName:
+          type: string
+        receiptDate:
+          type: string
+          format: date
+        subtotal:
+          type: number
+          format: float
+        tax:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+        splits:
           type: array
+          description: List of how the total cost is split across categories. Must sum to subtotal.
           items:
-            $ref: '#/components/schemas/Transaction'
+            $ref: '#/components/schemas/Split'
       required:
-        - transactions
+        - accountId
+        - splits
 
   securitySchemes: {}
