@@ -6,14 +6,11 @@ var multer = require('multer');
 var storage = multer.memoryStorage();
 var upload = multer({ storage: storage });
 
+
+
 /* GET home page. */
 router.get('/', function(req, res, next) {
-  // If view engine not configured, fallback to a JSON greeting
-  if (res.render) {
-    res.render('index', { title: 'Express' });
-  } else {
-    res.json({ message: 'Receipt Reader API (Express)' });
-  }
+  res.json({ message: 'Receipt Reader API' });
 });
 
 // GET /getBudgetInformation
@@ -88,6 +85,12 @@ router.post('/submitReceipt', function(req, res) {
   // In a real app you'd persist the transaction and generate an id.
   var id = 'rcpt_' + Date.now().toString(36);
   res.json({ ok: true, id: id });
+});
+
+
+// health check endpoint
+router.get('/status', function(req, res) {
+  res.json({ status: 'ok' });
 });
 
 module.exports = router;

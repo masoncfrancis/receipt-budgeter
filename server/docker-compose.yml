@@ -1,0 +1,17 @@
+services:
+  server:
+    build: .
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - ACTUAL_PASSWORD=${ACTUAL_PASSWORD}
+      - ACTUAL_SERVER_URL=${ACTUAL_SERVER_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
+  actual:
+    image: actualbudget/actual-server:latest
+    ports:
+      - "5006:5006"
+    restart: unless-stopped
