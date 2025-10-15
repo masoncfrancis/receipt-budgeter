@@ -9,8 +9,6 @@ RUN npm install
 
 COPY . .
 
-RUN mkdir -p actualcache
-
 EXPOSE 3010
 
 CMD ["npm", "start"]
