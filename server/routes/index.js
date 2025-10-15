@@ -1,6 +1,13 @@
+'use strict'
+
 var express = require('express');
 var router = express.Router();
 var multer = require('multer');
+let actualApi = require('@actual-app/api');
+let envFilePath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
+require('dotenv').config({ path: envFilePath });
+
+
 
 // Use memory storage for simplicity (no files written to disk in this boilerplate)
 var storage = multer.memoryStorage();
@@ -14,18 +21,73 @@ router.get('/', function(req, res, next) {
 });
 
 // GET /getBudgetInformation
-// Returns example budget categories and accounts from openapi.yaml
-router.get('/getBudgetInformation', function(req, res) {
-  res.json({
-    availableCategories: [
-      { id: 'food', name: 'Food & Dining' },
-      { id: 'transport', name: 'Transportation' }
-    ],
-    accounts: [
-      { id: 'checking', name: 'Checking Account' },
-      { id: 'credit-card', name: 'Credit Card' }
-    ]
-  });
+// Returns budget categories and accounts from Actual API or example data if TEST_DATA_ENABLED is set.
+router.get('/getBudgetInformation', async function(req, res) {
+  // If Actual server is not configured, return an error
+  if (!process.env.ACTUAL_SERVER_URL) {
+    console.log('ACTUAL_SERVER_URL not configured; returning example categories.');
+    return res.status(500).json({ error: 'ACTUAL_SERVER_URL not configured' });
+  }
+
+  // If TEST_DATA_ENABLED is set (string 'true'), return the printed/example categories
+  if (process.env.TEST_DATA_ENABLED === 'true') {
+    const sampleCategories = [
+      { id: 'exampleCategory1', name: 'Example Category 1' },
+      { id: 'exampleCategory2', name: 'Example Category 2' }
+    ];
+
+    const sampleAccounts = [
+      { id: 'exampleAccount1', name: 'Example Account 1' },
+      { id: 'exampleAccount2', name: 'Example Account 2' }
+    ];
+
+    return res.json({ availableCategories: sampleCategories, accounts: sampleAccounts });
+  }
+
+  // Otherwise, initialize Actual API, fetch categories and accounts, map them to {id,name}, and return.
+  try {
+    await actualApi.init({
+      serverURL: process.env.ACTUAL_SERVER_URL,
+      password: process.env.ACTUAL_PASSWORD,
+      dataDir: './actualcache'
+    });
+
+    await actualApi.downloadBudget(process.env.ACTUAL_BUDGET_FILE_ID); // Load the budget file
+    await actualApi.sync(); // Ensure data is up to date
+
+    const categories = await actualApi.getCategories();
+    const accounts = await actualApi.getAccounts ? await actualApi.getAccounts() : [];
+
+
+    // Shut down the API client once finished
+    try {
+      await actualApi.shutdown();
+    } catch (shutdownErr) {
+      // Log but don't fail the whole request because of shutdown problems
+      console.error('Error shutting down Actual API client:', shutdownErr);
+    }
+
+    // Map categories/accounts to the shape expected by the frontend
+    const mappedCategories = Array.isArray(categories) ? categories.map(function(c) {
+      return { id: c.id, name: c.name };
+    }) : [];
+
+    const mappedAccounts = Array.isArray(accounts) ? accounts.map(function(a) {
+      return { id: a.id, name: a.name };
+    }) : [];
+
+    return res.json({ availableCategories: mappedCategories, accounts: mappedAccounts });
+  } catch (err) {
+    // Ensure we attempt to shutdown if init succeeded partially
+    try {
+      await actualApi.shutdown();
+    } catch (e) {
+      // ignore
+    }
+
+    console.error('Failed to get budget information from Actual API:', err);
+    res.status(500).json({ error: 'Failed to fetch budget information', details: String(err) });
+  }
 });
 
 // POST /analyzeReceipt
