@@ -9,10 +9,16 @@ const path = require('path');
 const envFilePath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
 require('dotenv').config({ path: envFilePath });
 
-// If './actualcache' directory doesn't exist, create it to avoid errors with Actual API
-const actualCacheDir = path.join(__dirname, './actualcache');
+// Ensure './actualcache' exists in the process working directory (this matches
+// where the Actual API expects './actualcache' when running in Docker).
+const actualCacheDir = path.join(process.cwd(), 'actualcache');
 if (!fs.existsSync(actualCacheDir)) {
-  fs.mkdirSync(actualCacheDir);
+  try {
+    fs.mkdirSync(actualCacheDir, { recursive: true });
+    console.log('Created actualcache directory at', actualCacheDir);
+  } catch (e) {
+    console.error('Failed to create actualcache directory:', e);
+  }
 }
 
 
@@ -55,7 +61,7 @@ router.get('/getBudgetInformation', async function(req, res) {
     await actualApi.init({
       serverURL: process.env.ACTUAL_SERVER_URL,
       password: process.env.ACTUAL_PASSWORD,
-      dataDir: './actualcache'
+      dataDir: actualCacheDir
     });
 
     await actualApi.downloadBudget(process.env.ACTUAL_BUDGET_FILE_ID); // Load the budget file
