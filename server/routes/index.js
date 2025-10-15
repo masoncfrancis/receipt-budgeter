@@ -4,15 +4,21 @@ var express = require('express');
 var router = express.Router();
 var multer = require('multer');
 let actualApi = require('@actual-app/api');
-let envFilePath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
+const fs = require('fs');
+const path = require('path');
+const envFilePath = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.local';
 require('dotenv').config({ path: envFilePath });
 
+// If './actualcache' directory doesn't exist, create it to avoid errors with Actual API
+const actualCacheDir = path.join(__dirname, './actualcache');
+if (!fs.existsSync(actualCacheDir)) {
+  fs.mkdirSync(actualCacheDir);
+}
 
 
 // Use memory storage for simplicity (no files written to disk in this boilerplate)
 var storage = multer.memoryStorage();
 var upload = multer({ storage: storage });
-
 
 
 /* GET home page. */
