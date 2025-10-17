@@ -11,7 +11,7 @@ function LoginLanding() {
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
             <div className="bg-white/5 dark:bg-gray-800 p-10 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 transition-colors duration-300 text-center">
                 <h1 className="text-4xl font-extrabold mb-6 text-gray-800 dark:text-white transition-colors duration-300">
-                    Receipt Reader
+                    Receipt Budgeter
                 </h1>
                 <p className="text-lg mb-8 text-gray-200 transition-colors duration-300">
                     You must log in to continue
