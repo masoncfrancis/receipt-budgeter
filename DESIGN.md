@@ -1,8 +1,8 @@
-# receipt-reader design
+# receipt-budgeter design
 
 ## Overview
 
-The receipt reader is designed to extract and process information from various types of receipts, such as grocery, restaurant, and retail receipts. The system leverages multi-modal large language models (LLMs) to extract data from receipts, and to identify and categorize key data points.
+The receipt budgeter is designed to extract and process information from various types of receipts, such as grocery, restaurant, and retail receipts. The system leverages multi-modal large language models (LLMs) to extract data from receipts, and to identify and categorize key data points.
 
 ## User Flow
 

@@ -1,9 +1,9 @@
 openapi: 3.2.0
 info:
-  title: Receipt Reader API
+  title: Receipt Budgeter API
   version: 1.0.0
   description: >-
-    Minimal OpenAPI spec for the Receipt Reader service. Provides endpoints
+    Minimal OpenAPI spec for the Receipt Budgeter service. Provides endpoints
     for retrieving budget information, analyzing receipt images (file upload),
     and submitting receipts (JSON transactions).
 servers:
