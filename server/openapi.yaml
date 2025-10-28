@@ -51,9 +51,15 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Receipt image file to analyze
+                  description: |-
+                    Receipt image file to analyze.
+                    Allowed MIME types: image/png, image/jpeg, image/webp, image/heic, image/heif
               required:
                 - file
+            encoding:
+              file:
+                # Some tools accept a comma-separated list here; this documents allowed types
+                contentType: "image/png, image/jpeg, image/webp, image/heic, image/heif"
       responses:
         '200':
           description: Analysis result
@@ -167,22 +173,6 @@ components:
         - availableCategories
         - accounts
 
-    AnalyzeItem:
-      type: object
-      properties:
-        name:
-          type: string
-        itemKind:
-          type: string
-        budgetCategoryGuess:
-          type: string
-        price:
-          type: number
-          format: float
-      required:
-        - name
-        - price
-
     AnalyzeReceiptResponse:
       type: object
       properties:
@@ -195,13 +185,10 @@ components:
           format: date
         subtotal:
           type: number
-          format: float
         taxAmount:
           type: number
-          format: float
         totalPrice:
           type: number
-          format: float
         items:
           type: array
           items:
@@ -209,6 +196,22 @@ components:
       required:
         - totalPrice
         - items
+
+    AnalyzeItem:
+      type: object
+      properties:
+        itemName:
+          type: string
+        name:
+          type: string
+        itemKind:
+          type: string
+        price:
+          type: number
+        budgetCategoryGuess:
+          type: string
+      required:
+        - price
 
     Transaction:
       type: object
