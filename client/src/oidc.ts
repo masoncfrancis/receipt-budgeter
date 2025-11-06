@@ -17,7 +17,8 @@ let getOidc: any;
 
 if (ALLOW_ANONYMOUS) {
     // Lightweight fake implementations for anonymous mode.
-    OidcProvider = ({ children }) => React.createElement(React.Fragment, null, children);
+    OidcProvider = ({ children }: { children: React.ReactNode }) =>
+        React.createElement(React.Fragment, null, children);
     useOidc = () => ({ isUserLoggedIn: true, user: { name: 'Anonymous', sub: 'anonymous' } });
     getOidc = async () => ({
         isUserLoggedIn: true,
