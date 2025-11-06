@@ -10,8 +10,8 @@ import { getOidc } from './oidc'
 const VITE_ALLOW_ANONYMOUS =
     typeof import.meta !== 'undefined' &&
     Boolean(
-        (import.meta as any).env?.VITE_VITE_ALLOW_ANONYMOUS === '1' ||
-            (import.meta as any).env?.VITE_VITE_ALLOW_ANONYMOUS === 'true'
+        (import.meta as any).env?.VITE_ALLOW_ANONYMOUS === '1' ||
+            (import.meta as any).env?.VITE_ALLOW_ANONYMOUS === 'true'
     )
 
 function InnerApp() {
