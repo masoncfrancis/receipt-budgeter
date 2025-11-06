@@ -3,6 +3,7 @@
 var express = require('express');
 var router = express.Router();
 var multer = require('multer');
+const fs = require('fs');
 const { GoogleGenAI, Type } = require('@google/genai')
 const budgetService = require('../services/budgetService')
 
