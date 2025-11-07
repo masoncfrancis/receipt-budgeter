@@ -28,6 +28,7 @@ export default function ReceiptForm() {
   const [items, setItems] = useState<ParsedItem[] | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [view, setView] = useState<'upload' | 'results'>('upload')
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files && e.target.files[0]
@@ -41,6 +42,7 @@ export default function ReceiptForm() {
     try {
       const res = await mockApiFind(file)
       setItems(res)
+      setView('results')
     } finally {
       setLoading(false)
     }
@@ -87,123 +89,121 @@ export default function ReceiptForm() {
           </div>
 
           <div className="space-y-8">
-            {/* File input card */}
-            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Receipt Photo <span className="text-red-500">*</span></label>
-              <div className="relative rounded-md overflow-hidden border border-dashed border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-800/40">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onFileChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div className="p-6 text-center">
-                  <div className="mt-3 flex flex-col items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { /* noop; input overlay handles click */ }}
-                      className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
-                    >
-                      Choose file
-                    </button>
-                    {file && (
-                      <span className="mt-1 block px-3 py-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs text-center">{file.name}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-center">
-              <div className="w-full max-w-xl flex flex-col sm:flex-row gap-4">
-                <button
-                    className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
-                  onClick={() => { setFile(null); setItems(null) }}
-                >
-                  Reset
-                </button>
-                <button
-                  className="flex-1 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-60"
-                  onClick={onSubmit}
-                  disabled={!file || loading}
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center" aria-hidden="true">
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                      </svg>
-                      <span className="sr-only">Processing</span>
-                    </span>
-                  ) : (
-                    'Check the Receipt'
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Items found */}
-            <div>
-              
-
-              {items && (
-                <div className="space-y-4">
-                  <div className="flex flex-col items-center gap-1 mb-2 text-center">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Here's what we found</h2>
-                    <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
-                  </div>
-
-                  {/* Receipt-level payment method selection */}
-                  <div className="flex items-center justify-center">
-                    <div className="w-full max-w-md">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
-                      >
-                        <option value="">Select payment</option>
-                        {PAYMENT_OPTIONS.map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                      {items.map((it) => (
-                        <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                        <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} onRemove={handleRemoveItem} />
-                      </div>
-                    ))}
-                      <div className="flex justify-end">
+            {view === 'upload' ? (
+              <>
+                <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Receipt Photo <span className="text-red-500">*</span></label>
+                  <div className="relative rounded-md overflow-hidden border border-dashed border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-800/40">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="p-6 text-center">
+                      <div className="mt-3 flex flex-col items-center gap-2">
                         <button
                           type="button"
-                          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100"
-                          onClick={handleAddItem}
+                          onClick={() => { /* noop; input overlay handles click */ }}
+                          className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
                         >
-                          + Add item
+                          Choose file
                         </button>
+                        {file && (
+                          <span className="mt-1 block px-3 py-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs text-center">{file.name}</span>
+                        )}
                       </div>
-                  </div>
-
-                  <div className="flex items-center justify-center mt-2">
-                    <div className="w-full max-w-lg flex flex-col sm:flex-row gap-4">
-                      <button
-                        className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
-                        onClick={() => setItems(null)}
-                      >
-                        Reset
-                      </button>
-                      <button className="flex-1 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-semibold shadow" onClick={handleSave}>
-                        Save to Budget
-                      </button>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+
+                <div className="flex items-center justify-center">
+                  <div className="w-full max-w-xl flex flex-col sm:flex-row gap-4">
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
+                      onClick={() => { setFile(null); setItems(null) }}
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-60"
+                      onClick={onSubmit}
+                      disabled={!file || loading}
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center" aria-hidden="true">
+                          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                          </svg>
+                          <span className="sr-only">Processing</span>
+                        </span>
+                      ) : (
+                        'Check the Receipt'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col items-center gap-1 mb-2 text-center">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Here's what we found</h2>
+                  <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
+                </div>
+
+                <div className="flex items-center justify-center">
+                  <div className="w-full max-w-md">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
+                    >
+                      <option value="">Select payment</option>
+                      {PAYMENT_OPTIONS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  {items?.map((it) => (
+                    <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
+                      <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} onRemove={handleRemoveItem} />
+                    </div>
+                  ))}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100"
+                      onClick={handleAddItem}
+                    >
+                      + Add item
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center mt-2">
+                  <div className="w-full max-w-lg flex flex-col sm:flex-row gap-4">
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
+                      onClick={() => { setItems(null); setFile(null); setView('upload') }}
+                    >
+                      Back
+                    </button>
+                    <button className="flex-1 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-semibold shadow" onClick={handleSave}>
+                      Save to Budget
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
