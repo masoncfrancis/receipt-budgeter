@@ -67,25 +67,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyzeReceiptResponse'
-              examples:
-                example-1:
-                  summary: Typical analysis
-                  value:
-                    merchantName: "Corner Grocery"
-                    merchantLocation: "123 Woodward Ave, Detroit"
-                    receiptDate: "2025-10-01"
-                    subtotal: 42.5
-                    taxAmount: 3.4
-                    totalPrice: 45.9
-                    items:
-                      - name: "2% Reduced Fat"
-                        itemKind: "milk"
-                        budgetCategoryGuess: "grocery"
-                        price: 3.5
-                      - name: "Whole Grain Loaf"
-                        itemKind: "bread"
-                        budgetCategoryGuess: "grocery"
-                        price: 2.5
+
 
   /submitReceipt:
     post:
@@ -176,26 +158,48 @@ components:
     AnalyzeReceiptResponse:
       type: object
       properties:
-        merchantName:
-          type: string
-        merchantLocation:
-          type: string
-        receiptDate:
-          type: string
-          format: date
-        subtotal:
-          type: number
-        taxAmount:
-          type: number
-        totalPrice:
-          type: number
+        receiptData:
+          $ref: '#/components/schemas/ReceiptData'
         items:
           type: array
           items:
-            $ref: '#/components/schemas/AnalyzeItem'
+            $ref: '#/components/schemas/AnalyzedItem'
       required:
-        - totalPrice
+        - receiptData
         - items
+
+    ReceiptData:
+      type: object
+      properties:
+        subtotal:
+          type: number
+        total:
+          type: number
+        storeName:
+          type: string
+        storeLocation:
+          type: string
+      required:
+        - total
+
+    AnalyzedItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+        itemName:
+          type: string
+        itemKind:
+          type: string
+        price:
+          type: number
+        budgetCategoryName:
+          type: string
+        budgetCategoryId:
+          type: string
+      required:
+        - itemName
+        - price
 
     AnalyzeItem:
       type: object

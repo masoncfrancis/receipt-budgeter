@@ -55,25 +55,30 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
 
   // If TEST_DATA_ENABLED is set, return sample data instead of AI response
   if (process.env.TEST_DATA_ENABLED === 'true') {
+    // Return object shaped to match OpenAPI AnalyzeReceiptResponse
     return res.json({
-      merchantName: 'Corner Grocery',
-      merchantLocation: '123 Woodward Ave, Detroit',
-      receiptDate: '2025-10-01',
-      subtotal: 42.5,
-      taxAmount: 3.4,
-      totalPrice: 45.9,
+      receiptData: {
+        subtotal: 42.5,
+        total: 45.9,
+        storeName: 'Corner Grocery',
+        storeLocation: '123 Woodward Ave, Detroit'
+      },
       items: [
         {
-          name: '2% Reduced Fat',
+          itemId: 'item_1',
+          itemName: '2% Reduced Fat',
           itemKind: 'milk',
-          budgetCategoryGuess: 'grocery',
-          price: 3.5
+          price: 3.5,
+          budgetCategoryName: 'Grocery',
+          budgetCategoryId: 'grocery'
         },
         {
-          name: 'Whole Grain Loaf',
+          itemId: 'item_2',
+          itemName: 'Whole Grain Loaf',
           itemKind: 'bread',
-          budgetCategoryGuess: 'grocery',
-          price: 2.5
+          price: 2.5,
+          budgetCategoryName: 'Grocery',
+          budgetCategoryId: 'grocery'
         }
       ]
     });
@@ -137,7 +142,10 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
 
 
 
-  // Parse receipt response and create an item id for each item to help with matching later
+  // Parse receipt response and normalize shapes. The AI may return items either
+  // at the top-level as `items` or nested under `receiptData.items`. We want to
+  // return a clean object { receiptData, items } where `receiptData` does NOT
+  // include an `items` property.
   let receiptParsed;
   try {
     receiptParsed = JSON.parse(response.text);
@@ -146,16 +154,25 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
     return res.status(500).json({ error: 'Invalid AI response for receipt analysis', details: String(err) });
   }
 
-  const itemRequestList = receiptParsed.items || [];
+  // Pull out items from either top-level or nested receiptData
+  let itemRequestList = [];
+  if (Array.isArray(receiptParsed.items)) {
+    itemRequestList = receiptParsed.items;
+  } else if (receiptParsed.receiptData && Array.isArray(receiptParsed.receiptData.items)) {
+    itemRequestList = receiptParsed.receiptData.items;
+  }
+
+  // Ensure stable itemId for matching
   for (let i = 0; i < itemRequestList.length; i++) {
-    itemRequestList[i].id = `item_${i + 1}`;
+    itemRequestList[i].itemId = itemRequestList[i].itemId || itemRequestList[i].id || `item_${i + 1}`;
   }
 
   let itemListText = "";
   for (const item of itemRequestList) {
     const name = item.itemName || item.name || '';
     const kind = item.itemKind || '';
-    itemListText += `- Name: ${name}, Item Kind: ${kind}, ID: ${item.id}\n`;
+    const id = item.itemId || item.id || '';
+    itemListText += `- Name: ${name}, Item Kind: ${kind}, ID: ${id}\n`;
   }
 
   // Fetch budget categories once and build the list text
@@ -209,7 +226,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
     return res.status(500).json({ error: 'AI item categorization failed', details: String(err) });
   }
 
-  // Check the response to make sure there is a category for each item, checking to make sure all item ids are present. If one is missing, set it's category id to 0 and category name to "Unknown". Log an error but don't fail the request.
+  // Check the response to make sure there is a category for each item, mapping by itemId.
   let itemCategories;
   try {
     itemCategories = JSON.parse(categoryResponse.text);
@@ -225,21 +242,44 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
   for (const itemCategory of itemCategories) {
     itemCategoryMap[itemCategory.itemId] = itemCategory;
   }
+
+  // Build final items list in the OpenAPI AnalyzedItem shape
+  const finalItems = [];
   for (const item of itemRequestList) {
-    if (!itemCategoryMap[item.id]) {
+    const id = item.itemId || item.id || '';
+    const cat = itemCategoryMap[id];
+    if (!cat) {
       console.error('Missing category for item:', item);
-      itemCategories.push({
-        itemId: item.id,
-        itemName: item.itemName,
-        budgetCategoryId: '0',
-        budgetCategoryName: 'Unknown'
-      });
     }
+    finalItems.push({
+      itemId: id,
+      itemName: item.itemName || item.name || '',
+      itemKind: item.itemKind || '',
+      price: Number(item.price) || 0,
+      budgetCategoryName: (cat && cat.budgetCategoryName) || (cat && cat.categoryName) || 'Unknown',
+      budgetCategoryId: (cat && cat.budgetCategoryId) || (cat && cat.categoryId) || '0'
+    });
   }
 
+  // Ensure receiptData doesn't include a nested `items` array (we return
+  // the items at top-level per the OpenAPI schema). The AI may return the
+  // receipt fields either nested under `receiptData` or at the top-level
+  // (subtotal, total, storeName, etc.). Normalize both cases.
+  let returnedReceiptData = {};
+  if (receiptParsed && receiptParsed.receiptData && typeof receiptParsed.receiptData === 'object') {
+    returnedReceiptData = Object.assign({}, receiptParsed.receiptData);
+  } else if (receiptParsed && typeof receiptParsed === 'object') {
+    // Copy top-level properties except `items` (these are handled separately)
+    for (const k of Object.keys(receiptParsed)) {
+      if (k === 'items') continue;
+      returnedReceiptData[k] = receiptParsed[k];
+    }
+  }
+  if (returnedReceiptData.items) delete returnedReceiptData.items;
+
   return res.json({
-    receiptData: JSON.parse(response.text),
-    itemCategories: itemCategories
+    receiptData: returnedReceiptData,
+    items: finalItems
   });
 });
 
