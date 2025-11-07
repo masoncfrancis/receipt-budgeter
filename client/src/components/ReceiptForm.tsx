@@ -16,9 +16,9 @@ const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
 
     // Return deterministic mock data for UI testing
   return [
-    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries' },
-    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries' },
-    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining' },
+    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries', price: 2.49 },
+    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries', price: 3.19 },
+    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining', price: 1.5 },
   ]
 }
 

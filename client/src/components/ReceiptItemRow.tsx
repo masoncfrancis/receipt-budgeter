@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ParsedItem } from './types'
 
 type Props = {
@@ -7,6 +8,20 @@ type Props = {
 }
 
 export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props) {
+  const [priceStr, setPriceStr] = useState<string>(() => (typeof item.price === 'number' ? item.price.toFixed(2) : ''))
+
+  const commitPrice = () => {
+    if (priceStr === '') {
+      onChange(item.id, { price: undefined })
+      return
+    }
+    const parsed = Number(priceStr)
+    if (Number.isNaN(parsed)) return
+    const rounded = Math.round(parsed * 100) / 100
+    setPriceStr(rounded.toFixed(2))
+    onChange(item.id, { price: rounded })
+  }
+
   return (
     <div className="p-3 bg-gray-900/60 border border-gray-800 rounded-lg shadow-sm">
       <div className="flex flex-col gap-3">
@@ -26,6 +41,7 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props)
                 value={item.budgetCategory}
                 onChange={(e) => onChange(item.id, { budgetCategory: e.target.value })}
               >
+              <option value="" disabled className="bg-gray-800 text-gray-400">Please choose one...</option>
               {budgetOptions.map((opt) => (
                 <option key={opt} value={opt} className="bg-gray-800">
                   {opt}
@@ -37,6 +53,22 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props)
                   <path d="M6 8l4 4 4-4" />
                 </svg>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">Price</label>
+            <div className="mt-1">
+              <input
+                type="number"
+                step="0.01"
+                className="w-full h-10 bg-transparent border border-gray-600 rounded px-3 text-gray-100"
+                value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                onBlur={commitPrice}
+                onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
+                placeholder="0.00"
+              />
             </div>
           </div>
         </div>
