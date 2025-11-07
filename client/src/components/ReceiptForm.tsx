@@ -16,9 +16,9 @@ const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
 
     // Return deterministic mock data for UI testing
   return [
-    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries', price: 2.49 },
-    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries', price: 3.19 },
-    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining', price: 1.5 },
+    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries', price: 2.49, manual: false },
+    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries', price: 3.19, manual: false },
+    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining', price: 1.5, manual: false },
   ]
 }
 
@@ -49,6 +49,17 @@ export default function ReceiptForm() {
   const handleItemChange = (id: string, patch: Partial<ParsedItem>) => {
     if (!items) return
     setItems(items.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  }
+
+  const handleAddItem = () => {
+    const newItem: ParsedItem = { id: uuidv4(), name: '', kind: '', budgetCategory: '', price: undefined, manual: true }
+    setItems((prev) => (prev ? [...prev, newItem] : [newItem]))
+  }
+
+  const handleRemoveItem = (id: string) => {
+    if (!items) return
+    const next = items.filter((it) => it.id !== id)
+    setItems(next.length > 0 ? next : null)
   }
 
   const handleSave = () => {
@@ -163,9 +174,18 @@ export default function ReceiptForm() {
                   <div className="flex flex-col gap-4">
                       {items.map((it) => (
                         <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                        <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} />
+                        <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} onRemove={handleRemoveItem} />
                       </div>
                     ))}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100"
+                          onClick={handleAddItem}
+                        >
+                          + Add item
+                        </button>
+                      </div>
                   </div>
 
                   <div className="flex items-center justify-center mt-2">

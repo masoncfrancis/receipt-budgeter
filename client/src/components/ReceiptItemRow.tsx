@@ -5,9 +5,10 @@ type Props = {
   item: ParsedItem
   budgetOptions: string[]
   onChange: (id: string, patch: Partial<ParsedItem>) => void
+  onRemove?: (id: string) => void
 }
 
-export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props) {
+export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove }: Props) {
   const [priceStr, setPriceStr] = useState<string>(() => (typeof item.price === 'number' ? item.price.toFixed(2) : ''))
 
   const commitPrice = () => {
@@ -25,13 +26,39 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange }: Props)
   return (
     <div className="p-3 bg-gray-900/60 border border-gray-800 rounded-lg shadow-sm">
       <div className="flex flex-col gap-3">
-        <div className="font-semibold text-gray-100">{item.name}</div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="w-full">
+            {item.manual ? (
+              <input
+                type="text"
+                className="w-full bg-transparent border border-gray-700 rounded px-2 py-1 text-gray-100"
+                placeholder="Item name"
+                value={item.name}
+                onChange={(e) => onChange(item.id, { name: e.target.value })}
+              />
+            ) : (
+              <div className="font-semibold text-gray-100">{item.name || 'Unnamed item'}</div>
+            )}
+          </div>
+          {onRemove && (
+            <button
+              type="button"
+              aria-label="Remove item"
+              className="text-lg text-red-500 hover:text-red-400 ml-2"
+              onClick={() => onRemove(item.id)}
+            >
+              ×
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="text-sm text-gray-300">We think this is</label>
-            <div className="mt-1 w-full h-10 bg-gray-800/20 border border-gray-700 rounded px-3 flex items-center text-gray-300 cursor-default select-none">{item.kind || 'Unknown'}</div>
-          </div>
+          {!item.manual && (
+            <div>
+              <label className="text-sm text-gray-300">We think this is</label>
+              <div className="mt-1 w-full h-10 bg-gray-800/20 border border-gray-700 rounded px-3 flex items-center text-gray-300 cursor-default select-none">{item.kind || 'Unknown'}</div>
+            </div>
+          )}
 
           <div>
             <label className="text-sm text-gray-300">Budget Category <strong>(select one)</strong></label>
