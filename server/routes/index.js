@@ -17,6 +17,11 @@ router.get('/', function(req, res, next) {
   res.json({ message: 'Receipt Budgeter API' });
 });
 
+// GET /status
+router.get('/status', function(req, res, next) {
+  res.status(200).json({ status: 'ok' });
+});
+
 // GET /getBudgetInformation
 // Returns budget categories and accounts from Actual API or example data if TEST_DATA_ENABLED is set.
 router.get('/getBudgetInformation', async function(req, res) {

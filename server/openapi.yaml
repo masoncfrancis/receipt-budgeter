@@ -11,6 +11,27 @@ servers:
     description: Local development server
 
 paths:
+  /status:
+    get:
+      summary: Get service status
+      operationId: getStatus
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                required:
+                  - status
+              examples:
+                example-1:
+                  value:
+                    status: "ok"
+                    
   /getBudgetInformation:
     get:
       summary: Get budget categories and accounts
@@ -274,6 +295,14 @@ components:
           description: List of how the total cost is split across categories. Must sum to subtotal.
           items:
             $ref: '#/components/schemas/Split'
+        doBankSync:
+          type: boolean
+          description: Whether to sync Actual Budget transactions with the bank before submitting this receipt to Actual Budget
+          default: true
+        createTransactions:
+          type: boolean
+          description: Whether to create a new transaction for this receipt
+          default: false
       required:
         - accountId
         - splits
