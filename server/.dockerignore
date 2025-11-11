@@ -1,3 +1,4 @@
 testimages/
 actualcache/
 node_modules/
+.env.*

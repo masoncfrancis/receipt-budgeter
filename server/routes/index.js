@@ -12,12 +12,8 @@ var storage = multer.memoryStorage();
 var upload = multer({ storage: storage });
 
 
-/* GET home page. */
-router.get('/', function(req, res, next) {
-  res.json({ message: 'Receipt Budgeter API' });
-});
-
 // GET /status
+// Health check endpoint
 router.get('/status', function(req, res, next) {
   res.status(200).json({ status: 'ok' });
 });
