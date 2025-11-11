@@ -1,16 +1,26 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { useOidc } from '../oidc'
-import type { ParsedItem } from './types'
+import type { ParsedItem, MockResponse } from './types'
 import ReceiptItemRow from './ReceiptItemRow'
 import { v4 as uuidv4 } from 'uuid'
 
-type BudgetInfo = {
-  availableCategories: { id: string; name: string }[]
-  accounts: { id: string; name: string }[]
-}
+const MOCK_BUDGETS = ['groceries', 'transport', 'entertainment', 'utilities', 'dining', 'other']
 
-// Keep a small client-side fallback in case backend isn't running
-const FALLBACK_BUDGETS = ['groceries', 'transport', 'entertainment', 'utilities', 'dining', 'other']
+// Placeholder payment methods for the whole receipt (will come from backend later)
+const PAYMENT_OPTIONS = ['Visa **** 1234', 'Mastercard **** 5678', 'Cash', 'Amex **** 9012', 'Other']
+
+// Mock API that finds items on a receipt (friendly wording)
+const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
+  // Simulate an OCR/API call delay
+  await new Promise((r) => setTimeout(r, 700))
+
+    // Return deterministic mock data for UI testing
+  return [
+    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries', price: 2.49, manual: false },
+    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries', price: 3.19, manual: false },
+    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining', price: 1.5, manual: false },
+  ]
+}
 
 export default function ReceiptForm() {
   const { decodedIdToken, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
@@ -20,51 +30,6 @@ export default function ReceiptForm() {
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'upload' | 'results'>('upload')
 
-  // Budget options and payment/account options come from the API
-  const [budgetOptions, setBudgetOptions] = useState<string[]>(FALLBACK_BUDGETS)
-  const [paymentOptions, setPaymentOptions] = useState<string[]>(['Cash'])
-  // Receipt-level metadata returned by analyzeReceipt
-  const [receiptData, setReceiptData] = useState<{
-    subtotal?: number
-    tax?: number
-    total?: number
-    storeName?: string
-    storeLocation?: string
-  } | null>(null)
-
-  // Fetch budget information when user is logged in
-  useEffect(() => {
-    if (!isUserLoggedIn) return
-
-    let mounted = true
-    ;(async () => {
-      try {
-        const res = await fetch('/getBudgetInformation')
-        if (!res.ok) throw new Error(`unexpected status ${res.status}`)
-        const json: BudgetInfo = await res.json()
-        if (!mounted) return
-        // Map categories to simple strings for the select
-        const cats = json.availableCategories && json.availableCategories.length > 0
-          ? json.availableCategories.map((c) => c.name)
-          : FALLBACK_BUDGETS
-        setBudgetOptions(cats)
-
-        const pays = json.accounts && json.accounts.length > 0
-          ? json.accounts.map((a) => `${a.name} (${a.id})`)
-          : ['Cash']
-        setPaymentOptions(pays)
-      } catch (err) {
-        // On any failure, keep the fallback lists
-        // Optionally log to console for debugging
-        // eslint-disable-next-line no-console
-        console.warn('Failed to load budget information, using fallbacks', err)
-        setBudgetOptions(FALLBACK_BUDGETS)
-        setPaymentOptions(['Cash'])
-      }
-    })()
-    return () => { mounted = false }
-  }, [isUserLoggedIn])
-
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files && e.target.files[0]
     if (!f) return
@@ -72,68 +37,12 @@ export default function ReceiptForm() {
     setItems(null)
   }
 
-  // POST multipart/form-data to /analyzeReceipt
-  const analyzeReceipt = async (fileToSend: File | null): Promise<ParsedItem[]> => {
-    if (!fileToSend) return []
-    const fd = new FormData()
-    fd.append('file', fileToSend)
-
-    const res = await fetch('/analyzeReceipt', { method: 'POST', body: fd })
-    if (!res.ok) {
-      throw new Error(`analysis failed: ${res.status}`)
-    }
-
-    const json = await res.json()
-    // Server conforms to AnalyzeReceiptResponse: { receiptData, items }
-    const serverItems: any[] = Array.isArray(json.items) ? json.items : []
-    const serverReceipt = json.receiptData ?? {}
-
-    // Map receipt-level metadata into state
-    setReceiptData({
-      subtotal: typeof serverReceipt.subtotal === 'number' ? serverReceipt.subtotal : undefined,
-      tax: typeof serverReceipt.tax === 'number' ? serverReceipt.tax : undefined,
-      total: typeof serverReceipt.total === 'number' ? serverReceipt.total : undefined,
-      storeName: serverReceipt.storeName ?? serverReceipt.store_name ?? undefined,
-      storeLocation: serverReceipt.storeLocation ?? serverReceipt.store_location ?? undefined,
-    })
-
-    // Map server items to ParsedItem[]; be defensive about missing fields
-    const mapped: ParsedItem[] = serverItems.map((it) => ({
-      id: it.itemId ?? uuidv4(),
-      name: it.itemName ?? it.name ?? 'Unnamed item',
-      kind: it.itemKind ?? it.kind,
-      budgetCategory: it.budgetCategoryName ?? it.budgetCategoryId ?? '',
-      price: typeof it.price === 'number' ? it.price : (typeof it.amount === 'number' ? it.amount : undefined),
-      manual: false,
-    }))
-
-    // If server returned nothing, fallback to a small mock so UI can still be exercised
-    if (mapped.length === 0) {
-      // Also set a mock receiptData so the UI shows totals during dev
-      setReceiptData({ subtotal: 5.49, tax: 0.5, total: 5.99, storeName: 'Demo Grocery', storeLocation: '123 Example St' })
-      return [
-        { id: uuidv4(), name: 'Sample Item', kind: 'misc', budgetCategory: FALLBACK_BUDGETS[0], price: 1.0, manual: false },
-      ]
-    }
-
-    return mapped
-  }
-
   const onSubmit = async () => {
     setLoading(true)
     try {
-      const res = await analyzeReceipt(file)
+      const res = await mockApiFind(file)
       setItems(res)
-      // If receiptData wasn't set by analyzeReceipt (shouldn't happen), set a small fallback
-      if (!receiptData) {
-        setReceiptData({ subtotal: res.reduce((s, r) => s + (r.price ?? 0), 0), tax: undefined, total: undefined })
-      }
       setView('results')
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Receipt analysis failed', err)
-      alert('Failed to analyze receipt. Please try again or use the mock fallback.')
-      // leave items as null so user can retry
     } finally {
       setLoading(false)
     }
@@ -158,7 +67,6 @@ export default function ReceiptForm() {
   const handleSave = () => {
     // For now just log the final payload — in real app we'd POST this to server
     const payload = { paymentMethod: paymentMethod || null, items }
-    // eslint-disable-next-line no-console
     console.log('Saving receipt', payload)
     alert(`Receipt saved (mock). Payment: ${paymentMethod || 'not selected'}. Check console for payload.`)
   }
@@ -255,36 +163,17 @@ export default function ReceiptForm() {
                       className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
                     >
                       <option value="">Select payment</option>
-                      {paymentOptions.map((p) => (
+                      {PAYMENT_OPTIONS.map((p) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Receipt summary: subtotal / tax / total and store info */}
-                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm text-gray-500">Store</div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{receiptData?.storeName ?? 'Unknown store'}</div>
-                      {receiptData?.storeLocation && <div className="text-sm text-gray-500">{receiptData?.storeLocation}</div>}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">Subtotal</div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{typeof receiptData?.subtotal === 'number' ? `$${receiptData.subtotal.toFixed(2)}` : '—'}</div>
-                      <div className="text-sm text-gray-500 mt-1">Tax</div>
-                      <div className="text-sm text-gray-700">{typeof receiptData?.tax === 'number' ? `$${receiptData.tax.toFixed(2)}` : '—'}</div>
-                      <div className="text-sm text-gray-500 mt-1">Total</div>
-                      <div className="font-bold text-gray-900 dark:text-white">{typeof receiptData?.total === 'number' ? `$${receiptData.total.toFixed(2)}` : (typeof receiptData?.subtotal === 'number' ? `$${receiptData.subtotal.toFixed(2)}` : '—')}</div>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex flex-col gap-4">
                   {items?.map((it) => (
                     <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                      <ReceiptItemRow item={it} budgetOptions={budgetOptions} onChange={handleItemChange} onRemove={handleRemoveItem} />
+                      <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} onRemove={handleRemoveItem} />
                     </div>
                   ))}
 
