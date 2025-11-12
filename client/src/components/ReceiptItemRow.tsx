@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import type { ParsedItem } from './types'
+import type { ParsedItem, Category } from './types'
 
 type Props = {
   item: ParsedItem
-  budgetOptions: string[]
+  budgetOptions: Category[]
   onChange: (id: string, patch: Partial<ParsedItem>) => void
-  onRemove?: (id: string) => void
+  onRemove?: (id:string) => void
 }
 
 export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove }: Props) {
@@ -70,8 +70,8 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove
               >
               <option value="" disabled className="bg-gray-800 text-gray-400">Please choose one...</option>
               {budgetOptions.map((opt) => (
-                <option key={opt} value={opt} className="bg-gray-800">
-                  {opt}
+                <option key={opt.id} value={opt.id} className="bg-gray-800">
+                  {opt.name}
                 </option>
               ))}
               </select>

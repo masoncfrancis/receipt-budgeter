@@ -196,7 +196,7 @@ export default function ReceiptForm() {
                       onChange={(e) => setAccountId(e.target.value)}
                       className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
                     >
-                      <option value="">Select account</option>
+                      <option value="" disabled selected>Select account</option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
@@ -207,7 +207,7 @@ export default function ReceiptForm() {
                 <div className="flex flex-col gap-4">
                   {items?.map((it) => (
                     <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                      <ReceiptItemRow item={it} budgetOptions={availableCategories.map(cat => cat.id)} onChange={handleItemChange} onRemove={handleRemoveItem} />
+                      <ReceiptItemRow item={it} budgetOptions={availableCategories} onChange={handleItemChange} onRemove={handleRemoveItem} />
                     </div>
                   ))}
 
