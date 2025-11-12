@@ -1,34 +1,42 @@
-import { useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent, useEffect } from 'react'
 import { useOidc } from '../oidc'
-import type { ParsedItem, MockResponse } from './types'
+import type { ParsedItem, Category, Account, BudgetInformationResponse, AnalyzeReceiptResponse } from './types'
 import ReceiptItemRow from './ReceiptItemRow'
 import { v4 as uuidv4 } from 'uuid'
 
-const MOCK_BUDGETS = ['groceries', 'transport', 'entertainment', 'utilities', 'dining', 'other']
-
-// Placeholder payment methods for the whole receipt (will come from backend later)
-const PAYMENT_OPTIONS = ['Visa **** 1234', 'Mastercard **** 5678', 'Cash', 'Amex **** 9012', 'Other']
-
-// Mock API that finds items on a receipt (friendly wording)
-const mockApiFind = async (_file: File | null): Promise<MockResponse> => {
-  // Simulate an OCR/API call delay
-  await new Promise((r) => setTimeout(r, 700))
-
-    // Return deterministic mock data for UI testing
-  return [
-    { id: uuidv4(), name: 'Whole Wheat Bread', kind: 'bread', budgetCategory: 'groceries', price: 2.49, manual: false },
-    { id: uuidv4(), name: '2% Milk 1L', kind: 'milk', budgetCategory: 'groceries', price: 3.19, manual: false },
-    { id: uuidv4(), name: 'Chocolate Bar', kind: 'snack', budgetCategory: 'dining', price: 1.5, manual: false },
-  ]
-}
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
 export default function ReceiptForm() {
   const { decodedIdToken, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
   const [file, setFile] = useState<File | null>(null)
   const [items, setItems] = useState<ParsedItem[] | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<string>('')
+  const [accountId, setAccountId] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'upload' | 'results'>('upload')
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [budgetInfoLoading, setBudgetInfoLoading] = useState<boolean>(true)
+
+  useEffect(() => {
+    const fetchBudgetInformation = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/getBudgetInformation`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const data: BudgetInformationResponse = await response.json()
+        setAvailableCategories(data.availableCategories)
+        setAccounts(data.accounts)
+      } catch (error) {
+        console.error('Failed to fetch budget information:', error)
+        // Optionally, set an error state to display to the user
+      } finally {
+        setBudgetInfoLoading(false)
+      }
+    }
+
+    fetchBudgetInformation()
+  }, [])
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files && e.target.files[0]
@@ -38,11 +46,37 @@ export default function ReceiptForm() {
   }
 
   const onSubmit = async () => {
+    if (!file) return
+
     setLoading(true)
     try {
-      const res = await mockApiFind(file)
-      setItems(res)
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`${BACKEND_URL}/analyzeReceipt`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data: AnalyzeReceiptResponse = await response.json()
+      const parsedItems: ParsedItem[] = data.items.map((item) => ({
+        id: item.itemId,
+        name: item.itemName,
+        kind: item.itemKind,
+        budgetCategory: item.budgetCategoryId,
+        budgetCategoryName: item.budgetCategoryName,
+        price: item.price,
+        manual: false,
+      }))
+      setItems(parsedItems)
       setView('results')
+    } catch (error) {
+      console.error('Failed to analyze receipt:', error)
+      // Optionally, set an error state to display to the user
     } finally {
       setLoading(false)
     }
@@ -54,7 +88,7 @@ export default function ReceiptForm() {
   }
 
   const handleAddItem = () => {
-    const newItem: ParsedItem = { id: uuidv4(), name: '', kind: '', budgetCategory: '', price: undefined, manual: true }
+    const newItem: ParsedItem = { id: uuidv4(), name: '', kind: '', budgetCategory: '', budgetCategoryName: '', price: undefined, manual: true }
     setItems((prev) => (prev ? [...prev, newItem] : [newItem]))
   }
 
@@ -66,9 +100,9 @@ export default function ReceiptForm() {
 
   const handleSave = () => {
     // For now just log the final payload — in real app we'd POST this to server
-    const payload = { paymentMethod: paymentMethod || null, items }
+    const payload = { accountId: accountId || null, items }
     console.log('Saving receipt', payload)
-    alert(`Receipt saved (mock). Payment: ${paymentMethod || 'not selected'}. Check console for payload.`)
+    alert(`Receipt saved (mock). Account: ${accountId || 'not selected'}. Check console for payload.`)
   }
 
   return (
@@ -130,9 +164,9 @@ export default function ReceiptForm() {
                       type="button"
                       className="flex-1 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-60"
                       onClick={onSubmit}
-                      disabled={!file || loading}
+                      disabled={!file || loading || budgetInfoLoading}
                     >
-                      {loading ? (
+                      {loading || budgetInfoLoading ? (
                         <span className="flex items-center justify-center" aria-hidden="true">
                           <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -158,13 +192,13 @@ export default function ReceiptForm() {
                   <div className="w-full max-w-md">
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
                     <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
                       className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
                     >
-                      <option value="">Select payment</option>
-                      {PAYMENT_OPTIONS.map((p) => (
-                        <option key={p} value={p}>{p}</option>
+                      <option value="">Select account</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
                     </select>
                   </div>
@@ -173,7 +207,7 @@ export default function ReceiptForm() {
                 <div className="flex flex-col gap-4">
                   {items?.map((it) => (
                     <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                      <ReceiptItemRow item={it} budgetOptions={MOCK_BUDGETS} onChange={handleItemChange} onRemove={handleRemoveItem} />
+                      <ReceiptItemRow item={it} budgetOptions={availableCategories.map(cat => cat.id)} onChange={handleItemChange} onRemove={handleRemoveItem} />
                     </div>
                   ))}
 
