@@ -55,6 +55,7 @@ PORT=3010
 Example `client/.env` (Vite):
 
 ```env
+VITE_BACKEND_URL=http://localhost:3010
 VITE_ALLOW_ANONYMOUS=false
 VITE_OIDC_ISSUER=https://auth.example.org
 VITE_OIDC_CLIENT_ID=my-client-id
