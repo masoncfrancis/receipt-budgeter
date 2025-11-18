@@ -20,6 +20,8 @@ services:
     restart: unless-stopped
 
 
+
+# Remove this service if you have an Actual server already set up.
   actual:
     image: actualbudget/actual-server:25.11.0-alpine
     ports:
