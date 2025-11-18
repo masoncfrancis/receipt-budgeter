@@ -101,7 +101,7 @@ For example, using `serve` (a popular quick-and-dirtyNode.js static server):
 npx serve -s dist
 ```
 
-**Architecture (high-level)**
+## Architecture (high-level) 
 
 - **Client (`client/`)**: A Vite + React single-page app. Responsible for the UI, authenticating users (optional), and sending receipt images and submit requests to the server. Authentication is configured via OIDC environment variables (`VITE_OIDC_*`). The client exposes a small set of components including `ReceiptForm` and `ReceiptItemRow`.
 
@@ -122,14 +122,14 @@ npx serve -s dist
   4. Server requests budget categories from the Actual API 
   5. Server asks the LLM to map each item to a budget category, then returns a normalized `AnalyzeReceiptResponse` JSON to the client.
 
-**Development Notes & Tips**
+## Development Notes & Tips
 - If you're prototyping without an Actual server, set `TEST_DATA_ENABLED=true` in `server/.env.local` to avoid needing Actual or Google Gemini credentials.
 - The server creates (or expects) an `actualcache` directory in its working directory to store cached Actual API data; this is created automatically when the server starts.
 - For Google GenAI make sure your service account has appropriate permissions and your environment points to the credentials with `GOOGLE_APPLICATION_CREDENTIALS`.
 
-**Troubleshooting**
+## Troubleshooting
 - If `GET /getBudgetInformation` fails with `ACTUAL_SERVER_URL not configured`, ensure the server env file includes `ACTUAL_SERVER_URL` or enable `TEST_DATA_ENABLED` for testing.
 - If AI calls fail, check that Google credentials are available to the server process and that network egress is permitted from your environment.
 
-**Contributing**
+## Contributing
 - Bug reports and PRs welcome. Follow the existing code style and keep changes minimal and focused.
