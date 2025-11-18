@@ -30,12 +30,14 @@ Server environment variables (put in `server/.env.local` or export in your shell
 - `ACTUAL_SERVER_URL` : (required) URL to your Actual API server
 - `ACTUAL_PASSWORD` : Password for Actual API (if required by your Actual server)
 - `PORT` : Port for Express to listen on (server defaults to `3010` if not provided)
+- `ALLOW_ANONYMOUS` : (optional) If `true`, allows anonymous access without authentication (default: `false`)
 
 Client environment variables (Vite — put in `client/.env` or `client/.env.local`):
 
 - `VITE_BACKEND_URL` : (required) URL of the backend API used by the client during development (e.g. `http://localhost:3010`). The client ships example files that set this.
-- `VITE_OIDC_CLIENT_ID` : (required) OIDC client ID for user authentication
-- `VITE_OIDC_ISSUER` : (required) OIDC issuer URL for user authentication
+- `VITE_ALLOW_ANONYMOUS` : (optional) If `true`, allows anonymous access without authentication (default: `false`)
+- `VITE_OIDC_CLIENT_ID` : (required, unless`VITE_ALLOW_ANONYMOUS=true`) OIDC client ID for user authentication
+- `VITE_OIDC_ISSUER` : (required, unless`VITE_ALLOW_ANONYMOUS=true`) OIDC issuer URL for user authentication
 
 
 Notes and example `server/.env.production`:
