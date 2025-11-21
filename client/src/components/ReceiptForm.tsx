@@ -114,15 +114,16 @@ export default function ReceiptForm() {
     const subtotal = items.reduce((acc, item) => acc + (item.price || 0), 0);
 
     let tax = null;
+    let taxRate = null;
     // if receiptData.subtotal exists, we can calculate tax.
     if (receiptData?.subtotal && receiptData.subtotal > 0) {
-        const calculatedTaxRate = (receiptData.total - receiptData.subtotal) / receiptData.subtotal;
-        tax = subtotal * calculatedTaxRate;
+        tax = receiptData.total - receiptData.subtotal;
+        taxRate = tax / receiptData.subtotal;
     }
 
     const total = subtotal + (tax || 0);
 
-    return { subtotal, tax, total };
+    return { subtotal, tax, total, taxRate };
   }, [items, receiptData]);
 
   return (
@@ -203,12 +204,14 @@ export default function ReceiptForm() {
               </>
             ) : (
               <>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
                 <div className="flex flex-col items-center gap-1 mb-2 text-center">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Here's what we found</h2>
-                  <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Your Receipt</h2>
+                  <div className="border border-gray-200 dark:border-orange-300 rounded-lg p-4 mb-4"><div className="text-sm text-gray-500 dark:text-gray-300"><strong>Remember:</strong> AI was used to figure out what's on your receipt, so it could be incorrect. Please double-check the results.</div></div>
+                  
                 </div>
 
-                <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
+                
 
                                 {receiptData && (
 
@@ -236,7 +239,7 @@ export default function ReceiptForm() {
                       onChange={(e) => setAccountId(e.target.value)}
                       className="w-full rounded-md border border-gray-300 dark:border-gray-600 p-2 bg-white dark:bg-gray-800 text-sm mb-4"
                     >
-                      <option value="" disabled selected>Select account</option>
+                      <option value="" disabled selected>Select account...</option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.id}>{account.name}</option>
                       ))}
@@ -271,7 +274,10 @@ export default function ReceiptForm() {
                         </div>
                         {totals.tax !== null && (
                           <div className="flex justify-between py-1">
-                            <span className="text-sm text-gray-600 dark:text-gray-300">Tax</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                              Tax
+                              {totals.taxRate !== null && ` (${(totals.taxRate * 100).toFixed(2)}%)`}
+                            </span>
                             <span className="text-sm font-medium text-gray-900 dark:text-white">${totals.tax.toFixed(2)}</span>
                           </div>
                         )}
