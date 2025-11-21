@@ -1,6 +1,6 @@
-import { useState, type ChangeEvent, useEffect } from 'react'
+import { useState, type ChangeEvent, useEffect, useMemo } from 'react'
 import { useOidc } from '../oidc'
-import type { ParsedItem, Category, Account, BudgetInformationResponse, AnalyzeReceiptResponse } from './types'
+import type { ParsedItem, Category, Account, BudgetInformationResponse, AnalyzeReceiptResponse, ReceiptData } from './types'
 import ReceiptItemRow from './ReceiptItemRow'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -10,6 +10,7 @@ export default function ReceiptForm() {
   const { decodedIdToken, isUserLoggedIn } = useOidc({ assert: 'user logged in' })
   const [file, setFile] = useState<File | null>(null)
   const [items, setItems] = useState<ParsedItem[] | null>(null)
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
   const [accountId, setAccountId] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'upload' | 'results'>('upload')
@@ -43,6 +44,7 @@ export default function ReceiptForm() {
     if (!f) return
     setFile(f)
     setItems(null)
+    setReceiptData(null)
   }
 
   const onSubmit = async () => {
@@ -73,6 +75,7 @@ export default function ReceiptForm() {
         manual: false,
       }))
       setItems(parsedItems)
+      setReceiptData(data.receiptData)
       setView('results')
     } catch (error) {
       console.error('Failed to analyze receipt:', error)
@@ -104,6 +107,23 @@ export default function ReceiptForm() {
     console.log('Saving receipt', payload)
     alert(`Receipt saved (mock). Account: ${accountId || 'not selected'}. Check console for payload.`)
   }
+
+  const totals = useMemo(() => {
+    if (!items) return null;
+
+    const subtotal = items.reduce((acc, item) => acc + (item.price || 0), 0);
+
+    let tax = null;
+    // if receiptData.subtotal exists, we can calculate tax.
+    if (receiptData?.subtotal && receiptData.subtotal > 0) {
+        const calculatedTaxRate = (receiptData.total - receiptData.subtotal) / receiptData.subtotal;
+        tax = subtotal * calculatedTaxRate;
+    }
+
+    const total = subtotal + (tax || 0);
+
+    return { subtotal, tax, total };
+  }, [items, receiptData]);
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
@@ -188,6 +208,13 @@ export default function ReceiptForm() {
                   <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
                 </div>
 
+                {receiptData && (
+                  <div className="mb-4 text-center">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{receiptData.storeName}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">{receiptData.storeLocation}</p>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-center">
                   <div className="w-full max-w-md">
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
@@ -220,6 +247,31 @@ export default function ReceiptForm() {
                       + Add item
                     </button>
                   </div>
+
+                  {totals && (
+                  <div className="mt-6 border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <div className="flex justify-end items-center text-right">
+                      <div className="w-full max-w-xs">
+                        <div className="flex justify-between py-1">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Subtotal</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">${totals.subtotal.toFixed(2)}</span>
+                        </div>
+                        {totals.tax !== null && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-sm text-gray-600 dark:text-gray-300">Tax</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">${totals.tax.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between py-1 border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
+                          <span className="text-base font-bold text-gray-900 dark:text-white">Total</span>
+                          <span className="text-base font-bold text-gray-900 dark:text-white">${totals.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+
+                  
                 </div>
 
                 <div className="flex items-center justify-center mt-2">
@@ -227,7 +279,7 @@ export default function ReceiptForm() {
                     <button
                       type="button"
                       className="flex-1 px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-transparent"
-                      onClick={() => { setItems(null); setFile(null); setView('upload') }}
+                      onClick={() => { setItems(null); setFile(null); setReceiptData(null); setView('upload') }}
                     >
                       Back
                     </button>
