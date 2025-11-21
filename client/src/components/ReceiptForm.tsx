@@ -208,12 +208,25 @@ export default function ReceiptForm() {
                   <div className="text-sm text-gray-500 dark:text-gray-300">Tell us the budget category for each item. We gave our best guess — please check.</div>
                 </div>
 
-                {receiptData && (
-                  <div className="mb-4 text-center">
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{receiptData.storeName}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-300">{receiptData.storeLocation}</p>
-                  </div>
-                )}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
+
+                                {receiptData && (
+
+                                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-4">
+
+                                    <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2 text-center"><u>Merchant Info</u></h3>
+
+                                    <div className="text-center">
+
+                                      <p className="text-md font-semibold text-gray-900 dark:text-white">{receiptData.storeName}</p>
+
+                                      <p className="text-sm text-gray-500 dark:text-gray-300">{receiptData.storeLocation}</p>
+
+                                    </div>
+
+                                  </div>
+
+                                )}
 
                 <div className="flex items-center justify-center">
                   <div className="w-full max-w-md">
