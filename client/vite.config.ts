@@ -1,17 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { tr } from 'zod/locales'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: true, // Allows access from host machine
-    port: 5173, // Consistent development port
+    port: 3011, // Consistent development port
     strictPort: true, // Ensures port is available or fails
     watch: {
       usePolling: true, // Necessary for file changes to be detected in Docker
       interval: 1000, // Polling interval
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3010',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
 })
