@@ -117,8 +117,9 @@ export default function ReceiptForm() {
     let taxRate = null;
     // if receiptData.subtotal exists, we can calculate tax.
     if (receiptData?.subtotal && receiptData.subtotal > 0) {
-        tax = receiptData.total - receiptData.subtotal;
-        taxRate = tax / receiptData.subtotal;
+        const calculatedTaxRate = (receiptData.total - receiptData.subtotal) / receiptData.subtotal;
+        taxRate = calculatedTaxRate;
+        tax = subtotal * taxRate;
     }
 
     const total = subtotal + (tax || 0);
