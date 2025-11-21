@@ -1,0 +1,55 @@
+{
+	"info": {
+		"_postman_id": "ef977f58-c5e6-4819-bc3e-2f12f804a5e5",
+		"name": "Receipt Budgeter API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1584477"
+	},
+	"item": [
+		{
+			"name": "/getBudgetInformation",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{SERVER_BASE_URL}}/getBudgetInformation",
+					"host": [
+						"{{SERVER_BASE_URL}}"
+					],
+					"path": [
+						"getBudgetInformation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/analyzeReceipt",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"description": "Add image file here",
+							"type": "file",
+							"src": []
+						}
+					]
+				},
+				"url": {
+					"raw": "{{SERVER_BASE_URL}}/analyzeReceipt",
+					"host": [
+						"{{SERVER_BASE_URL}}"
+					],
+					"path": [
+						"analyzeReceipt"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
