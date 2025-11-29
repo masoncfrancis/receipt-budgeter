@@ -61,8 +61,17 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
       receiptData: {
         subtotal: 42.5,
         total: 45.9,
+        taxAmount: 3.4,
         storeName: 'Corner Grocery',
-        storeLocation: '123 Woodward Ave, Detroit'
+        storeLocation: '123 Woodward Ave, Detroit',
+        taxRates: [
+          {
+            id: 'a',
+            name: 'State Tax',
+            rate: 0.07,
+            description: 'Statewide sales tax'
+          }
+        ]
       },
       items: [
         {
@@ -71,7 +80,8 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
           itemKind: 'milk',
           price: 3.5,
           budgetCategoryName: 'Grocery',
-          budgetCategoryId: 'grocery'
+          budgetCategoryId: 'grocery',
+          taxesApplied: []
         },
         {
           itemId: 'item_2',
@@ -79,7 +89,16 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
           itemKind: 'bread',
           price: 2.5,
           budgetCategoryName: 'Grocery',
-          budgetCategoryId: 'grocery'
+          budgetCategoryId: 'grocery',
+          taxesApplied: []
+        },
+        { itemId: 'item_3',
+          itemName: 'Office Chair',
+          itemKind: 'furniture',
+          price: 40.0,
+          budgetCategoryName: 'Home Improvement',
+          budgetCategoryId: 'home_improvement',
+          taxesApplied: ['a']
         }
       ]
     });
