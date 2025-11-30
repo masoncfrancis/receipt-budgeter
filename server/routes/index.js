@@ -60,14 +60,14 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
     return res.json({
       receiptData: {
         subtotal: 42.5,
-        total: 45.9,
-        taxAmount: 3.4,
+        total: 45.3,
+        taxAmount: 2.8,
         storeName: 'Corner Grocery',
         storeLocation: '123 Woodward Ave, Detroit',
         taxRates: [
           {
             id: 'a',
-            name: 'State Tax',
+            name: 'State Sales Tax',
             rate: 0.07,
             description: 'Statewide sales tax'
           }
