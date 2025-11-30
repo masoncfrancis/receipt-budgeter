@@ -111,6 +111,15 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
   try {
     const base64ImageFile = req.file.buffer.toString('base64');
 
+    const receiptDataPrompt = `Please list the items on this receipt, along with information about each item. 
+    
+    Your response should also include the name and location (meaning the city and state) of the store.
+    Ignore any receipt annotations or markings that are not related to the items purchased (e.g. Costco's "Bottom of Basket" annotations). DO NOT ignore sub-items, such as discounts or bottle deposits.
+
+    For each item, provide the name of the item as printed on the receipt.
+    Each item should include a guess of what sort of product it is (e.g. milk, bread, furniture, etc.) and the price. 
+    Your response should also include the subtotal, tax amount, and total as printed on the receipt. Include the tax rates if listed on the receipt. The rate should be in decimal format (e.g., 7% should be 0.07). Otherwise, return null for tax rates list.`
+
     // Get receipt contents
     const receiptInfoContents = [
       {
@@ -119,7 +128,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
           data: base64ImageFile,
         },
       },
-      { text: "Please list the items on this receipt, along with information about each item. Each item should include a guess of what sort of product it is (e.g. milk, bread, furniture, etc.) and the price. Your response should also include the name and location of the store. It should also include the subtotal and total for the receipt." },
+      { text: receiptDataPrompt },
     ];
 
     const receiptInfoConfig = {
@@ -134,7 +143,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
                 properties: {
                   itemName: { type: Type.STRING },
                   itemKind: { type: Type.STRING },
-                  price: { type: Type.NUMBER }
+                  price: { type: Type.NUMBER },
                 },
                 propertyOrdering: ["itemName", "itemKind", "price"]
               }
@@ -142,10 +151,22 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
             subtotal: { type: Type.NUMBER },
             total: { type: Type.NUMBER },
             storeName: { type: Type.STRING },
-            storeLocation: { type: Type.STRING }
+            storeLocation: { type: Type.STRING },
+            taxAmount: { type: Type.NUMBER },
+            taxRates: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  rate: { type: Type.NUMBER },
+                  description: { type: Type.STRING }
+                },
+                propertyOrdering: ["rate", "description"]
+              }
+            }
           },
-          propertyOrdering: ["items", "subtotal", "total", "storeName", "storeLocation"]
-        },
+          propertyOrdering: ["items", "subtotal", "total", "storeName", "storeLocation", "taxAmount", "taxRates"]
+        }
       };
 
     response = await aiClient.models.generateContent({
@@ -159,8 +180,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
     return res.status(500).json({ error: 'AI receipt analysis failed', details: String(err) });
   }
 
-
-
+  
 
   // Parse receipt response and normalize shapes. The AI may return items either
   // at the top-level as `items` or nested under `receiptData.items`. We want to
@@ -297,9 +317,18 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
   }
   if (returnedReceiptData.items) delete returnedReceiptData.items;
 
+  // Ensure all tax rates have a stable ID
+  if (Array.isArray(returnedReceiptData.taxRates)) {
+    returnedReceiptData.taxRates.forEach((rate, i) => {
+      rate.id = rate.id || `tax_rate_${i}`;
+    });
+  }
+
+  const itemsWithTaxInfo = await determineTaxability(returnedReceiptData, finalItems);
+
   return res.json({
     receiptData: returnedReceiptData,
-    items: finalItems
+    items: itemsWithTaxInfo
   });
 });
 
@@ -334,5 +363,153 @@ router.post('/submitReceipt', function(req, res) {
 router.get('/status', function(req, res) {
   res.json({ status: 'ok' });
 });
+
+/**
+ * Determines which items are taxed based on receipt data.
+ * @param {object} receiptData - The receipt data.
+ * @param {Array<object>} items - The list of items.
+ * @returns {Promise<Array<object>>} - The items with tax information.
+ */
+async function determineTaxability(receiptData, items) {
+  const { taxAmount, taxRates, storeLocation } = receiptData;
+
+  // Initialize taxesApplied array for each item
+  items.forEach(item => {
+    item.taxesApplied = [];
+  });
+
+  const hasSingleTaxRate = taxRates && Array.isArray(taxRates) && taxRates.length === 1 && typeof taxRates[0].rate === 'number' && taxRates[0].rate > 0;
+  const hasTaxAmount = typeof taxAmount === 'number' && taxAmount > 0;
+
+  if (hasSingleTaxRate && hasTaxAmount) {
+    const taxRate = taxRates[0].rate;
+    const taxRateId = taxRates[0].id; // ID is guaranteed by prior logic
+    const taxableSubtotal = taxAmount / taxRate;
+
+    // Helper to find a subset of items that sums to a target.
+    // Uses a backtracking algorithm.
+    const findSubset = (target, candidates) => {
+      const result = [];
+      const find = (currentTarget, index, currentSubset) => {
+        // Using a small epsilon for floating point comparison
+        if (Math.abs(currentTarget) < 0.01) {
+          result.push(...currentSubset);
+          return true;
+        }
+        if (currentTarget < 0 || index >= candidates.length) {
+          return false;
+        }
+
+        // Try including the current item
+        if (find(currentTarget - candidates[index].price, index + 1, [...currentSubset, candidates[index]])) {
+          return true;
+        }
+        // Try excluding the current item
+        if (find(currentTarget, index + 1, currentSubset)) {
+          return true;
+        }
+        return false;
+      };
+
+      find(target, 0, []);
+      return result;
+    };
+
+    let taxedItems = [];
+    const centsAllowance = 5; // Search for a match allowing for up to 5 cents of rounding error
+    for (let i = 0; i <= centsAllowance * 2; i++) {
+      const offset = (i - centsAllowance) / 100.0; // Creates a range from -0.05 to +0.05
+      const target = taxableSubtotal + offset;
+      taxedItems = findSubset(target, items);
+      if (taxedItems.length > 0) {
+        // Found a combination that matches within the allowance
+        break;
+      }
+    }
+
+    if (taxedItems.length > 0) {
+      const taxedItemIds = new Set(taxedItems.map(item => item.itemId));
+      items.forEach(item => {
+        if (taxedItemIds.has(item.itemId)) {
+          item.taxesApplied.push(taxRateId);
+        }
+      });
+      return items;
+    }
+  }
+
+  // If no single tax rate or if the subset sum logic fails, ask the AI.
+  const aiClient = new GoogleGenAI({});
+  let itemListText = "";
+  items.forEach(item => {
+    itemListText += `- Name: ${item.itemName}, Kind: ${item.itemKind}, Category: ${item.itemCategory}, Price: ${item.price}\n`;
+  });
+
+  const locationInfo = storeLocation ? ` in ${storeLocation}` : '';
+  const taxAnalysisPrompt = `Given the following list of items from a receipt, identify which items are typically subject to sales tax${locationInfo}. Please return a JSON object with a single key, "taxableItems", which is an array of item names that are taxable.
+
+  Items:
+  ${itemListText}`;
+
+  const groundingTool = {
+    googleSearch: {},
+  };
+
+  const taxAnalysisConfig = {
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        taxableItems: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING
+          }
+        }
+      },
+      tools: [groundingTool],
+    }
+  };
+
+  try {
+    const taxResponse = await aiClient.models.generateContent({
+      model: "gemini-2.0-flash-lite",
+      contents: [{ text: taxAnalysisPrompt }],
+      config: taxAnalysisConfig,
+    });
+    const taxResult = JSON.parse(taxResponse.text);
+
+    if (taxResult && Array.isArray(taxResult.taxableItems) && taxResult.taxableItems.length > 0) {
+      const taxableItemNames = new Set(taxResult.taxableItems);
+      let taxIdToApply;
+
+      if (hasSingleTaxRate) {
+        // If a single rate existed but the subset sum failed, use that existing rate's ID.
+        taxIdToApply = receiptData.taxRates[0].id;
+      } else {
+        // Only create an "estimated" rate if no single rate was found to begin with.
+        taxIdToApply = 'tax_rate_estimated';
+        if (!receiptData.taxRates.some(rate => rate.id === taxIdToApply)) {
+          receiptData.taxRates.push({
+            id: taxIdToApply,
+            description: 'Estimated tax based on item type',
+            rate: null
+          });
+        }
+      }
+
+      items.forEach(item => {
+        if (taxableItemNames.has(item.itemName)) {
+          item.taxesApplied.push(taxIdToApply);
+        }
+      });
+    }
+  } catch (err) {
+    console.error('AI tax analysis failed:', err);
+    // Don't block the response if AI fails, just return items as-is.
+  }
+
+  return items;
+}
 
 module.exports = router;

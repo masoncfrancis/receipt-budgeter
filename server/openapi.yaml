@@ -236,30 +236,9 @@ components:
         taxesApplied:
           type: array
           items:
-            type: array
-            items:
-              type: string
+            type: string
       required:
         - itemName
-        - price
-
-    SubItem:
-      type: object
-      properties:
-        name:
-          type: string
-        itemKind:
-          type: string
-          description: Sub-item kind (e.g., "bottle deposit", "discount", etc.)
-        price:
-          type: number
-          format: float
-          description: Sub-item price
-        isPositiveValue:
-          type: boolean
-          description: Whether this sub-item adds to (true) or subtracts from (false) the receipt total
-      required:
-        - name
         - price
 
     AnalyzeItem:
