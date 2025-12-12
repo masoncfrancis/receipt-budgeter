@@ -208,7 +208,7 @@ export default function ReceiptForm() {
                 <div className="border-t border-gray-200 dark:border-gray-700 my-4"></div>
                 <div className="flex flex-col items-center gap-1 mb-2 text-center">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Your Receipt</h2>
-                  <div className="border border-gray-200 dark:border-orange-300 rounded-lg p-4 mb-4"><div className="text-sm text-gray-500 dark:text-gray-300"><strong>Remember:</strong> AI was used to figure out what's on your receipt, so it could be incorrect. Please double-check the results.</div></div>
+                  <div className="border border-gray-200 dark:border-orange-300 rounded-lg p-4 mb-4"><div className="text-sm text-gray-500 dark:text-gray-300"><strong>Remember:</strong> AI was used to figure out what's on your receipt, so the results could be incorrect. Please double-check before submitting.</div></div>
                   
                 </div>
 
