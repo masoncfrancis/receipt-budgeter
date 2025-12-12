@@ -108,8 +108,9 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
 
   // Generate receipt information from the uploaded file buffer
   let response;
+  let base64ImageFile;
   try {
-    const base64ImageFile = req.file.buffer.toString('base64');
+    base64ImageFile = req.file.buffer.toString('base64');
 
     const receiptDataPrompt = `Please list the items on this receipt, along with information about each item. 
     
@@ -440,40 +441,118 @@ async function determineTaxability(receiptData, items) {
 
   // If no single tax rate or if the subset sum logic fails, ask the AI.
   const aiClient = new GoogleGenAI({});
-  let itemListText = "";
-  items.forEach(item => {
-    itemListText += `- Name: ${item.itemName}, Kind: ${item.itemKind}, Category: ${item.itemCategory}, Price: ${item.price}\n`;
-  });
-
-  const locationInfo = storeLocation ? ` in ${storeLocation}` : '';
-  const taxAnalysisPrompt = `Given the following list of items from a receipt, identify which items are typically subject to sales tax${locationInfo}. Please return a JSON object with a single key, "taxableItems", which is an array of item names that are taxable.
-
-  Items:
-  ${itemListText}`;
+  const taxAnalysisPrompt = `Which of these individual items on the receipt have the sales tax applied, according to the sales tax regulations where this store is located? please DO NOT consider receipt annotations/receipt divisions such as Costco's "Bottom of Basket/BOB". Ignore the annotations, and pay attention only to the items themselves.`;
 
   const groundingTool = {
     googleSearch: {},
+    codeExecution: {}
   };
 
-  const taxAnalysisConfig = {
-    responseMimeType: "application/json",
-    responseSchema: {
-      type: Type.OBJECT,
-      properties: {
-        taxableItems: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.STRING
-          }
+  
+  const taxAnalysisSchema = {
+    type: "object",
+    properties: {
+      tax_rates: {
+        type: "array",
+        description: "A list of all sales tax rates applicable in the area/on the receipt.",
+        items: {
+          type: "object",
+          properties: {
+            tax_id: {
+              type: "string",
+              description: "Unique identifier for this specific tax rate (e.g., 'state_tax', 'county_levy', 'GST'). This ID is used to reference the tax in the 'items' array."
+            },
+            description: {
+              type: "string",
+              description: "A human-readable description of the tax (e.g., 'California State Sales Tax', 'City of Exampleburg Utility Levy')."
+            },
+            rate: {
+              type: "number",
+              format: "float",
+              description: "The tax rate as a decimal (e.g., 0.0825 for 8.25%)."
+            }
+          },
+          required: [
+            "tax_id",
+            "description",
+            "rate"
+          ]
         }
       },
-      tools: [groundingTool],
-    }
+      items: {
+        type: "array",
+        description: "The list of individual products or services purchased.",
+        items: {
+          type: "object",
+          properties: {
+            item_id: {
+              type: "string",
+              description: "Unique identifier for this receipt item."
+            },
+            description: {
+              type: "string",
+              description: "Name or description of the item."
+            },
+            price: {
+              type: "number",
+              format: "float",
+              description: "The price of a single unit."
+            },
+            applicable_tax_ids: {
+              type: "array",
+              description: "An array of 'tax_id' strings from the 'tax_rates' list that apply to this specific item.",
+              items: {
+                type: "string"
+              },
+              minItems: 0,
+              uniqueItems: true
+            }
+          },
+          required: [
+            "item_id",
+            "description",
+            "price",
+            "applicable_tax_ids"
+          ]
+        }
+      },
+      summary: {
+        type: "object",
+        description: "Summary of the financial totals for the receipt.",
+        properties: {
+          subtotal: {
+            type: "number",
+            format: "float",
+            description: "The sum of all 'line_total_pre_tax' from the items list."
+          },
+          total_tax: {
+            type: "number",
+            format: "float",
+            description: "The total amount of all taxes applied to all items."
+          },
+          grand_total: {
+            type: "number",
+            format: "float",
+            description: "The final amount (subtotal + total_tax)."
+          }
+        },
+        required: [
+          "subtotal",
+          "total_tax",
+          "grand_total"
+        ]
+      }
+    },
+    required: [
+      "tax_rates",
+      "items",
+      "summary"
+    ]
   };
 
   try {
     const taxResponse = await aiClient.models.generateContent({
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash",
       contents: [{ text: taxAnalysisPrompt }],
       config: taxAnalysisConfig,
     });
