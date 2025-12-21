@@ -113,18 +113,45 @@ export default function ReceiptForm() {
 
     const subtotal = items.reduce((acc, item) => acc + (item.price || 0), 0);
 
-    let tax = null;
-    let taxRate = null;
-    // if receiptData.subtotal exists, we can calculate tax.
-    if (receiptData?.subtotal && receiptData.subtotal > 0) {
-        const calculatedTaxRate = (receiptData.total - receiptData.subtotal) / receiptData.subtotal;
-        taxRate = calculatedTaxRate;
-        tax = subtotal * taxRate;
+    const rates = (receiptData && Array.isArray(receiptData.taxRates)) ? receiptData.taxRates : [];
+
+    // Build per-tax totals based on which taxes are applied to each item
+    const taxTotalsById: Record<string, { id: string; name?: string; rate: number | null; total: number }> = {};
+    for (const r of rates) {
+      taxTotalsById[r.id] = { id: r.id, name: r.name ?? r.description, rate: typeof r.rate === 'number' ? r.rate : null, total: 0 };
     }
 
-    const total = subtotal + (tax || 0);
+    // Sum taxes applied on items (only for rates that have a numeric rate)
+    let computedTax = 0;
+    for (const it of items) {
+      const applied = (it as any).taxesApplied || [];
+      for (const tid of applied) {
+        const tr = taxTotalsById[tid];
+        if (tr) {
+          if (typeof tr.rate === 'number' && typeof it.price === 'number') {
+            const amt = Math.round(it.price * tr.rate * 100) / 100;
+            tr.total += amt;
+            computedTax += amt;
+          }
+        } else {
+          // Unknown tax id — create an entry (rate unknown)
+          if (!taxTotalsById[tid]) {
+            taxTotalsById[tid] = { id: tid, name: tid, rate: null, total: 0 };
+          }
+        }
+      }
+    }
 
-    return { subtotal, tax, total, taxRate };
+    // Receipt-provided tax amount (fallback to total - subtotal if explicit taxAmount missing)
+    const receiptTaxAmount = typeof receiptData?.taxAmount === 'number'
+      ? receiptData.taxAmount
+      : (typeof receiptData?.total === 'number' && typeof receiptData?.subtotal === 'number')
+        ? receiptData.total - receiptData.subtotal
+        : null;
+
+    const total = subtotal + computedTax;
+
+    return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, total };
   }, [items, receiptData]);
 
   return (
@@ -251,7 +278,7 @@ export default function ReceiptForm() {
                 <div className="flex flex-col gap-4">
                   {items?.map((it) => (
                     <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                      <ReceiptItemRow item={it} budgetOptions={availableCategories} onChange={handleItemChange} onRemove={handleRemoveItem} />
+                      <ReceiptItemRow item={it} budgetOptions={availableCategories} onChange={handleItemChange} onRemove={handleRemoveItem} receiptData={(receiptData ?? { taxRates: [] }) as any} />
                     </div>
                   ))}
 
@@ -273,19 +300,27 @@ export default function ReceiptForm() {
                           <span className="text-sm text-gray-600 dark:text-gray-300">Subtotal</span>
                           <span className="text-sm font-medium text-gray-900 dark:text-white">${totals.subtotal.toFixed(2)}</span>
                         </div>
-                        {totals.tax !== null && (
-                          <div className="flex justify-between py-1">
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                              Tax
-                              {totals.taxRate !== null && ` (${(totals.taxRate * 100).toFixed(2)}%)`}
-                            </span>
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">${totals.tax.toFixed(2)}</span>
+
+                        {/* Per-tax breakdown computed from applied taxes on items */}
+                        {Object.values(totals.taxTotalsById).map((tr) => (
+                          <div key={tr.id} className="flex justify-between py-1">
+                            <span className="text-sm text-gray-600 dark:text-gray-300">{tr.name ?? tr.id}{tr.rate !== null ? ` (${(tr.rate * 100).toFixed(2)}%)` : ' (estimated)'}</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">${tr.total.toFixed(2)}</span>
                           </div>
-                        )}
+                        ))}
+
                         <div className="flex justify-between py-1 border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
                           <span className="text-base font-bold text-gray-900 dark:text-white">Total</span>
                           <span className="text-base font-bold text-gray-900 dark:text-white">${totals.total.toFixed(2)}</span>
                         </div>
+
+                        {totals.receiptTaxAmount !== null && (
+                          <div className="mt-2 text-sm text-gray-500">Receipt tax amount: <span className="font-medium text-gray-900 dark:text-white">${totals.receiptTaxAmount.toFixed(2)}</span></div>
+                        )}
+
+                        {totals.receiptTaxAmount !== null && Math.abs((totals.computedTax || 0) - totals.receiptTaxAmount) > 0.01 && (
+                          <div className="mt-2 text-sm text-red-500">Tax mismatch: computed <strong>${(totals.computedTax || 0).toFixed(2)}</strong> vs receipt <strong>${totals.receiptTaxAmount.toFixed(2)}</strong> (diff <strong>${((totals.computedTax || 0) - totals.receiptTaxAmount).toFixed(2)}</strong>)</div>
+                        )}
                       </div>
                     </div>
                   </div>

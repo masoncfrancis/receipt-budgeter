@@ -2,13 +2,21 @@ import { useState } from 'react'
 import type { ParsedItem, Category } from './types'
 
 type Props = {
-  item: ParsedItem
+  item: ParsedItem & { taxesApplied?: string[] }
   budgetOptions: Category[]
   onChange: (id: string, patch: Partial<ParsedItem>) => void
   onRemove?: (id:string) => void
+  receiptData: {
+    taxRates: Array<{
+      id: string
+      name?: string
+      description?: string
+      rate: number | null
+    }>
+  }
 }
 
-export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove }: Props) {
+export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove, receiptData }: Props) {
   const [priceStr, setPriceStr] = useState<string>(() => (typeof item.price === 'number' ? item.price.toFixed(2) : ''))
 
   const commitPrice = () => {
@@ -96,6 +104,36 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove
                 onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
                 placeholder="0.00"
               />
+            </div>
+            {/* Taxes applied for this item */}
+            <div className="mt-2">
+              {Array.isArray(item.taxesApplied) && item.taxesApplied.length > 0 ? (
+                (() => {
+                  const taxDetails = item.taxesApplied.map((tid) => {
+                    const rateObj = receiptData?.taxRates?.find((r) => r.id === tid)
+                    const rate = rateObj?.rate ?? null
+                    const name = rateObj?.name ?? rateObj?.description ?? tid
+                    const amount = (typeof rate === 'number' && typeof item.price === 'number') ? Math.round(item.price * rate * 100) / 100 : null
+                    return { id: tid, name, rate, amount }
+                  })
+                  const totalItemTax = taxDetails.reduce((acc, d) => acc + (d.amount || 0), 0)
+
+                  return (
+                    <div className="text-sm text-gray-300">
+                      <div className="mb-1">Tax: <span className="font-medium text-gray-100">{typeof item.price === 'number' ? `$${totalItemTax.toFixed(2)}` : '—'}</span></div>
+                      <div className="flex gap-2 flex-wrap">
+                        {taxDetails.map((t) => (
+                          <div key={t.id} className="text-xs px-2 py-1 bg-gray-800/30 rounded text-gray-200">
+                            {t.name}{t.rate !== null ? ` (${(t.rate * 100).toFixed(2)}%)` : ' (estimated)'}{t.amount !== null ? ` — $${t.amount.toFixed(2)}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : (
+                <div className="text-sm text-gray-500">No sales tax applied</div>
+              )}
             </div>
           </div>
         </div>

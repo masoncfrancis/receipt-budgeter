@@ -18,6 +18,15 @@ export type ReceiptData = {
   total: number
   storeName?: string
   storeLocation?: string
+  // Total tax amount reported on the receipt (optional)
+  taxAmount?: number
+  // List of tax rate objects discovered on the receipt (id+rate+optional name/description)
+  taxRates?: Array<{
+    id: string
+    name?: string
+    description?: string
+    rate?: number | null
+  }>
 }
 
 export type AnalyzedItem = {
@@ -42,6 +51,8 @@ export type ParsedItem = {
   budgetCategoryName?: string
   // Price in the item's currency (USD assumed). Optional until OCR provides it.
   price?: number
+  // Optional list of tax rate ids that apply to this item
+  taxesApplied?: string[]
   // Whether this item was manually added by the user (true) or came from analysis/OCR (false or undefined)
   manual?: boolean
 }
