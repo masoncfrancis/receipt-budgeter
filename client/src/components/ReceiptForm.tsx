@@ -17,6 +17,9 @@ export default function ReceiptForm() {
   const [availableCategories, setAvailableCategories] = useState<Category[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgetInfoLoading, setBudgetInfoLoading] = useState<boolean>(true)
+  const [localTaxRates, setLocalTaxRates] = useState<Array<{ id: string; name?: string; description?: string; rate?: number | null; enabled?: boolean }>>([])
+  const [newTaxName, setNewTaxName] = useState('')
+  const [newTaxRateStr, setNewTaxRateStr] = useState('')
 
   useEffect(() => {
     const fetchBudgetInformation = async () => {
@@ -108,17 +111,41 @@ export default function ReceiptForm() {
     alert(`Receipt saved (mock). Account: ${accountId || 'not selected'}. Check console for payload.`)
   }
 
+  // Initialize local tax rates when receiptData changes
+  useEffect(() => {
+    if (receiptData && Array.isArray(receiptData.taxRates)) {
+      const mapped = receiptData.taxRates.map((r) => ({ id: r.id, name: r.name, description: r.description, rate: typeof r.rate === 'number' ? r.rate : null, enabled: true }))
+      setLocalTaxRates(mapped)
+    } else {
+      setLocalTaxRates([])
+    }
+  }, [receiptData])
+
+  const addTaxRate = () => {
+    if (!newTaxName) return
+    const parsed = Number(newTaxRateStr)
+    const rate = Number.isNaN(parsed) ? null : (parsed > 1 ? parsed / 100 : parsed)
+    const t = { id: uuidv4(), name: newTaxName, description: undefined, rate, enabled: true }
+    setLocalTaxRates((prev) => [...prev, t])
+    setNewTaxName('')
+    setNewTaxRateStr('')
+  }
+
+  const toggleRateEnabled = (id: string) => {
+    setLocalTaxRates((prev) => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r))
+  }
+
   const totals = useMemo(() => {
     if (!items) return null;
 
     const subtotal = items.reduce((acc, item) => acc + (item.price || 0), 0);
 
-    const rates = (receiptData && Array.isArray(receiptData.taxRates)) ? receiptData.taxRates : [];
+    const rates = localTaxRates || [];
 
     // Build per-tax totals based on which taxes are applied to each item
-    const taxTotalsById: Record<string, { id: string; name?: string; rate: number | null; total: number }> = {};
+    const taxTotalsById: Record<string, { id: string; name?: string; rate: number | null; total: number; enabled?: boolean }> = {};
     for (const r of rates) {
-      taxTotalsById[r.id] = { id: r.id, name: r.name ?? r.description, rate: typeof r.rate === 'number' ? r.rate : null, total: 0 };
+      taxTotalsById[r.id] = { id: r.id, name: r.name ?? r.description, rate: typeof r.rate === 'number' ? r.rate : null, total: 0, enabled: r.enabled !== false };
     }
 
     // Sum taxes applied on items (only for rates that have a numeric rate)
@@ -128,7 +155,7 @@ export default function ReceiptForm() {
       for (const tid of applied) {
         const tr = taxTotalsById[tid];
         if (tr) {
-          if (typeof tr.rate === 'number' && typeof it.price === 'number') {
+          if (tr.enabled !== false && typeof tr.rate === 'number' && typeof it.price === 'number') {
             const amt = Math.round(it.price * tr.rate * 100) / 100;
             tr.total += amt;
             computedTax += amt;
@@ -152,7 +179,7 @@ export default function ReceiptForm() {
     const total = subtotal + computedTax;
 
     return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, total };
-  }, [items, receiptData]);
+  }, [items, receiptData, localTaxRates]);
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
@@ -259,6 +286,41 @@ export default function ReceiptForm() {
 
                                 )}
 
+                  {/* Tax management: list and add rates */}
+                  <div>
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-4">
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">Sales Taxes</h3>
+                      <div className="flex flex-col gap-2">
+                        {localTaxRates.length === 0 ? (
+                          <div className="text-sm text-gray-500">No tax rates detected. You can add one below.</div>
+                        ) : (
+                          localTaxRates.map((tr) => (
+                            <div key={tr.id} className="flex items-center justify-between">
+                              <div className="text-sm text-gray-700 dark:text-gray-200">
+                                <strong className="mr-2">{tr.name}</strong>
+                                {typeof tr.rate === 'number' ? <span className="text-gray-500">({(tr.rate * 100).toFixed(2)}%)</span> : <span className="text-gray-500">(rate unknown)</span>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <label className="inline-flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                  <input type="checkbox" checked={tr.enabled ?? true} onChange={() => toggleRateEnabled(tr.id)} className="mr-2" /> Enabled
+                                </label>
+                              </div>
+                            </div>
+                          ))
+                        )}
+
+                        <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                          <div className="flex gap-2">
+                            <input value={newTaxName} onChange={(e) => setNewTaxName(e.target.value)} placeholder="Tax name (e.g. State Sales)" className="flex-1 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
+                            <input value={newTaxRateStr} onChange={(e) => setNewTaxRateStr(e.target.value)} placeholder="Rate % (e.g. 7)" className="w-28 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
+                            <button onClick={addTaxRate} className="px-3 py-2 rounded-md bg-blue-600 text-white">Add</button>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">Enter a percentage (e.g. <em>7</em> for 7%) or a decimal (<em>0.07</em>).</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 <div className="flex items-center justify-center">
                   <div className="w-full max-w-md">
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Payment method for this receipt</label>
@@ -278,7 +340,7 @@ export default function ReceiptForm() {
                 <div className="flex flex-col gap-4">
                   {items?.map((it) => (
                     <div key={it.id} className="p-4 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg">
-                      <ReceiptItemRow item={it} budgetOptions={availableCategories} onChange={handleItemChange} onRemove={handleRemoveItem} receiptData={(receiptData ?? { taxRates: [] }) as any} />
+                      <ReceiptItemRow item={it} budgetOptions={availableCategories} onChange={handleItemChange} onRemove={handleRemoveItem} taxRates={localTaxRates} />
                     </div>
                   ))}
 

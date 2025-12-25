@@ -6,17 +6,16 @@ type Props = {
   budgetOptions: Category[]
   onChange: (id: string, patch: Partial<ParsedItem>) => void
   onRemove?: (id:string) => void
-  receiptData: {
-    taxRates: Array<{
-      id: string
-      name?: string
-      description?: string
-      rate: number | null
-    }>
-  }
+  taxRates: Array<{
+    id: string
+    name?: string
+    description?: string
+    rate?: number | null
+    enabled?: boolean
+  }>
 }
 
-export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove, receiptData }: Props) {
+export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove, taxRates }: Props) {
   const [priceStr, setPriceStr] = useState<string>(() => (typeof item.price === 'number' ? item.price.toFixed(2) : ''))
 
   const commitPrice = () => {
@@ -105,35 +104,50 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove
                 placeholder="0.00"
               />
             </div>
-            {/* Taxes applied for this item */}
+            {/* Taxes applied for this item: allow toggling per-rate */}
             <div className="mt-2">
-              {Array.isArray(item.taxesApplied) && item.taxesApplied.length > 0 ? (
-                (() => {
-                  const taxDetails = item.taxesApplied.map((tid) => {
-                    const rateObj = receiptData?.taxRates?.find((r) => r.id === tid)
-                    const rate = rateObj?.rate ?? null
-                    const name = rateObj?.name ?? rateObj?.description ?? tid
-                    const amount = (typeof rate === 'number' && typeof item.price === 'number') ? Math.round(item.price * rate * 100) / 100 : null
-                    return { id: tid, name, rate, amount }
-                  })
-                  const totalItemTax = taxDetails.reduce((acc, d) => acc + (d.amount || 0), 0)
+              <div className="text-sm text-gray-300 mb-1">Taxes</div>
+              <div className="flex gap-2 flex-wrap">
+                {taxRates && taxRates.length > 0 ? (
+                  taxRates.map((tr) => {
+                    const applied = Array.isArray(item.taxesApplied) && item.taxesApplied.includes(tr.id)
+                    const displayName = tr.name ?? tr.description ?? tr.id
+                    const rateNum = typeof tr.rate === 'number' ? tr.rate : null
+                    const disabled = tr.enabled === false
 
-                  return (
-                    <div className="text-sm text-gray-300">
-                      <div className="mb-1">Tax: <span className="font-medium text-gray-100">{typeof item.price === 'number' ? `$${totalItemTax.toFixed(2)}` : '—'}</span></div>
-                      <div className="flex gap-2 flex-wrap">
-                        {taxDetails.map((t) => (
-                          <div key={t.id} className="text-xs px-2 py-1 bg-gray-800/30 rounded text-gray-200">
-                            {t.name}{t.rate !== null ? ` (${(t.rate * 100).toFixed(2)}%)` : ' (estimated)'}{t.amount !== null ? ` — $${t.amount.toFixed(2)}` : ''}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()
-              ) : (
-                <div className="text-sm text-gray-500">No sales tax applied</div>
-              )}
+                    const toggle = () => {
+                      const current = Array.isArray(item.taxesApplied) ? [...item.taxesApplied] : []
+                      const idx = current.indexOf(tr.id)
+                      if (idx === -1) {
+                        // add
+                        current.push(tr.id)
+                      } else {
+                        current.splice(idx, 1)
+                      }
+                      onChange(item.id, { taxesApplied: current })
+                    }
+
+                    const amount = (rateNum !== null && typeof item.price === 'number') ? Math.round(item.price * rateNum * 100) / 100 : null
+
+                    return (
+                      <label key={tr.id} className={`inline-flex items-center px-2 py-1 rounded text-xs ${disabled ? 'opacity-50' : 'bg-gray-800/30'}` }>
+                        <input
+                          type="checkbox"
+                          checked={applied}
+                          disabled={disabled}
+                          onChange={toggle}
+                          className="mr-2"
+                        />
+                        <span className="font-medium text-gray-100">{displayName}{rateNum !== null ? ` (${(rateNum * 100).toFixed(2)}%)` : ''}</span>
+                        {amount !== null && <span className="ml-2 text-gray-300">— ${amount.toFixed(2)}</span>}
+                        {disabled && <span className="ml-2 text-xs text-yellow-300">(disabled)</span>}
+                      </label>
+                    )
+                  })
+                ) : (
+                  <div className="text-sm text-gray-500">No tax rates available</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
