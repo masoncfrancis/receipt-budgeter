@@ -182,9 +182,12 @@ export default function ReceiptForm() {
         ? receiptData.total - receiptData.subtotal
         : null;
 
+    // Receipt-provided subtotal (if available)
+    const receiptSubtotal = typeof receiptData?.subtotal === 'number' ? receiptData.subtotal : null;
+
     const total = subtotal + computedTax;
 
-    return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, total };
+    return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, receiptSubtotal, total };
   }, [items, receiptData, localTaxRates]);
 
   return (
@@ -400,6 +403,10 @@ export default function ReceiptForm() {
 
                         {totals.receiptTaxAmount !== null && Math.abs((totals.computedTax || 0) - totals.receiptTaxAmount) > 0.01 && (
                           <div className="mt-2 text-sm text-red-500">Tax mismatch: computed <strong>${(totals.computedTax || 0).toFixed(2)}</strong> vs receipt <strong>${totals.receiptTaxAmount.toFixed(2)}</strong> (diff <strong>${((totals.computedTax || 0) - totals.receiptTaxAmount).toFixed(2)}</strong>)</div>
+                        )}
+
+                        {totals.receiptSubtotal !== null && Math.abs(totals.subtotal - totals.receiptSubtotal) > 0.01 && (
+                          <div className="mt-2 text-sm text-red-500">Subtotal mismatch: computed <strong>${totals.subtotal.toFixed(2)}</strong> vs receipt <strong>${totals.receiptSubtotal.toFixed(2)}</strong> (diff <strong>${(totals.subtotal - totals.receiptSubtotal).toFixed(2)}</strong>)</div>
                         )}
                       </div>
                     </div>
