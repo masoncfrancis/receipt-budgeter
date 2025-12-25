@@ -2,6 +2,7 @@ services:
 
   client:
     build: ./client
+    container_name: receipt-budgeter-client
     ports:
       - "3011:3011"
     env_file:
@@ -13,6 +14,7 @@ services:
 
   server:
     build: ./server
+    container_name: receipt-budgeter-server
     ports:
       - "3010:3010"
     env_file:
