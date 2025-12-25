@@ -20,6 +20,7 @@ export default function ReceiptForm() {
   const [localTaxRates, setLocalTaxRates] = useState<Array<{ id: string; name?: string; description?: string; rate?: number | null; enabled?: boolean }>>([])
   const [newTaxName, setNewTaxName] = useState('')
   const [newTaxRateStr, setNewTaxRateStr] = useState('')
+  const [showAddTaxInputs, setShowAddTaxInputs] = useState(false)
 
   useEffect(() => {
     const fetchBudgetInformation = async () => {
@@ -125,14 +126,19 @@ export default function ReceiptForm() {
     if (!newTaxName) return
     const parsed = Number(newTaxRateStr)
     const rate = Number.isNaN(parsed) ? null : (parsed > 1 ? parsed / 100 : parsed)
-    const t = { id: uuidv4(), name: newTaxName, description: undefined, rate, enabled: true }
+    const t = { id: uuidv4(), name: newTaxName.trim(), description: undefined, rate, enabled: true }
     setLocalTaxRates((prev) => [...prev, t])
     setNewTaxName('')
     setNewTaxRateStr('')
+    setShowAddTaxInputs(false)
   }
 
   const toggleRateEnabled = (id: string) => {
     setLocalTaxRates((prev) => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r))
+  }
+
+  const removeTaxRate = (id: string) => {
+    setLocalTaxRates((prev) => prev.filter(r => r.id !== id))
   }
 
   const totals = useMemo(() => {
@@ -292,7 +298,7 @@ export default function ReceiptForm() {
                       <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">Sales Taxes</h3>
                       <div className="flex flex-col gap-2">
                         {localTaxRates.length === 0 ? (
-                          <div className="text-sm text-gray-500">No tax rates detected. You can add one below.</div>
+                          <div className="text-sm text-gray-500">No tax rates detected.</div>
                         ) : (
                           localTaxRates.map((tr) => (
                             <div key={tr.id} className="flex items-center justify-between">
@@ -302,20 +308,32 @@ export default function ReceiptForm() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <label className="inline-flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                  <input type="checkbox" checked={tr.enabled ?? true} onChange={() => toggleRateEnabled(tr.id)} className="mr-2" /> Enabled
+                                  <input type="checkbox" checked={tr.enabled ?? true} onChange={() => toggleRateEnabled(tr.id)} className="mr-2" />
                                 </label>
+                                <button type="button" onClick={() => removeTaxRate(tr.id)} title="Remove tax" aria-label="Remove tax" className="text-xl text-red-500 hover:text-red-400">✕</button>
                               </div>
                             </div>
                           ))
                         )}
 
                         <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
-                          <div className="flex gap-2">
-                            <input value={newTaxName} onChange={(e) => setNewTaxName(e.target.value)} placeholder="Tax name (e.g. State Sales)" className="flex-1 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
-                            <input value={newTaxRateStr} onChange={(e) => setNewTaxRateStr(e.target.value)} placeholder="Rate % (e.g. 7)" className="w-28 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
-                            <button onClick={addTaxRate} className="px-3 py-2 rounded-md bg-blue-600 text-white">Add</button>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">Enter a percentage (e.g. <em>7</em> for 7%) or a decimal (<em>0.07</em>).</div>
+                          {!showAddTaxInputs ? (
+                            <div className="flex justify-end">
+                              <button type="button" onClick={() => setShowAddTaxInputs(true)} className="px-3 py-2 rounded-md bg-blue-600 text-white" aria-label="Add tax rate" title="Add tax rate">+</button>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="flex gap-2">
+                                <input value={newTaxName} onChange={(e) => setNewTaxName(e.target.value)} placeholder="Tax name (e.g. State Sales)" className="flex-1 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
+                                <input value={newTaxRateStr} onChange={(e) => setNewTaxRateStr(e.target.value)} placeholder="Rate % (e.g. 7)" className="w-28 rounded-md border p-2 bg-white dark:bg-gray-800 text-sm" />
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">Enter a percentage (e.g. <em>7</em> for 7%) or a decimal (<em>0.07</em>).</div>
+                              <div className="flex justify-end gap-2 mt-2">
+                                <button type="button" onClick={addTaxRate} className="px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white" aria-label="Confirm add tax" title="Confirm">✓</button>
+                                <button type="button" onClick={() => { setShowAddTaxInputs(false); setNewTaxName(''); setNewTaxRateStr('') }} className="px-3 py-2 rounded-md bg-red-600 hover:bg-red-500 text-white" aria-label="Cancel add tax" title="Cancel">✕</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

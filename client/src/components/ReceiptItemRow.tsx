@@ -131,17 +131,17 @@ export default function ReceiptItemRow({ item, budgetOptions, onChange, onRemove
 
                     return (
                       <label key={tr.id} className={`inline-flex items-center px-2 py-1 rounded text-xs ${disabled ? 'opacity-50' : 'bg-gray-800/30'}` }>
-                        <input
-                          type="checkbox"
-                          checked={applied}
-                          disabled={disabled}
-                          onChange={toggle}
-                          className="mr-2"
-                        />
-                        <span className="font-medium text-gray-100">{displayName}{rateNum !== null ? ` (${(rateNum * 100).toFixed(2)}%)` : ''}</span>
-                        {amount !== null && <span className="ml-2 text-gray-300">— ${amount.toFixed(2)}</span>}
-                        {disabled && <span className="ml-2 text-xs text-yellow-300">(disabled)</span>}
-                      </label>
+                          <input
+                            type="checkbox"
+                            checked={applied}
+                            disabled={disabled}
+                            onChange={toggle}
+                            className="mr-2"
+                          />
+                          <span className="font-medium text-gray-100">{displayName}{rateNum !== null ? ` (${(rateNum * 100).toFixed(2)}%)` : ''}</span>
+                          {amount !== null && <span className="ml-2 text-gray-300">— ${amount.toFixed(2)}</span>}
+                          {disabled && <span className="ml-2 text-xs text-yellow-300">(disabled)</span>}
+                        </label>
                     )
                   })
                 ) : (
