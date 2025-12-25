@@ -187,8 +187,42 @@ export default function ReceiptForm() {
 
     const total = subtotal + computedTax;
 
-    return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, receiptSubtotal, total };
+    // Compute per-category totals (including taxes applied to items)
+    const categoryMap: Record<string, { id: string; name: string; subtotal: number; tax: number; total: number }> = {};
+    const categoryNameForId = (id: string | undefined, fallback: string) => {
+      if (!id) return fallback
+      const cat = availableCategories.find((c) => c.id === id)
+      return cat ? cat.name : fallback
+    }
+
+    for (const it of items) {
+      const catId = (it as any).budgetCategory || 'uncategorized'
+      const catName = categoryNameForId((it as any).budgetCategory, (it as any).budgetCategoryName || 'Uncategorized')
+      if (!categoryMap[catId]) categoryMap[catId] = { id: catId, name: catName, subtotal: 0, tax: 0, total: 0 }
+      const entry = categoryMap[catId]
+      const price = typeof it.price === 'number' ? it.price : 0
+      entry.subtotal += price
+
+      // taxes applied to this item
+      const applied = (it as any).taxesApplied || []
+      let itemTax = 0
+      for (const tid of applied) {
+        const tr = taxTotalsById[tid]
+        if (tr && tr.enabled !== false && typeof tr.rate === 'number') {
+          const amt = Math.round(price * tr.rate * 100) / 100
+          itemTax += amt
+        }
+      }
+      entry.tax += itemTax
+      entry.total += price + itemTax
+    }
+
+    const categoryTotals = Object.values(categoryMap)
+
+    return { subtotal, taxTotalsById, computedTax, receiptTaxAmount, receiptSubtotal, total, categoryTotals };
   }, [items, receiptData, localTaxRates]);
+
+  const [showCategoryTotals, setShowCategoryTotals] = useState(false)
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
@@ -235,6 +269,45 @@ export default function ReceiptForm() {
                     </div>
                   </div>
                 </div>
+                {showCategoryTotals && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowCategoryTotals(false)} />
+                    <div className="relative bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl z-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Category Totals (including tax)</h3>
+                        <button onClick={() => setShowCategoryTotals(false)} className="text-gray-500 hover:text-gray-700">Close</button>
+                      </div>
+                      <div className="space-y-2">
+                        {!(totals && totals.categoryTotals && totals.categoryTotals.length > 0) ? (
+                          <div className="text-sm text-gray-500">No items to summarize.</div>
+                        ) : (
+                          <div className="overflow-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-left text-gray-600 dark:text-gray-300">
+                                  <th className="pb-2">Category</th>
+                                  <th className="pb-2 text-right">Subtotal</th>
+                                  <th className="pb-2 text-right">Tax</th>
+                                  <th className="pb-2 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(totals?.categoryTotals ?? []).map((c) => (
+                                  <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                                    <td className="py-2 text-gray-800 dark:text-gray-200">{c.name}</td>
+                                    <td className="py-2 text-right text-gray-700 dark:text-gray-300">${c.subtotal.toFixed(2)}</td>
+                                    <td className="py-2 text-right text-gray-700 dark:text-gray-300">${c.tax.toFixed(2)}</td>
+                                    <td className="py-2 text-right font-semibold text-gray-900 dark:text-white">${c.total.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-center">
                   <div className="w-full max-w-xl flex flex-col sm:flex-row gap-4">
@@ -430,6 +503,45 @@ export default function ReceiptForm() {
                     </button>
                   </div>
                 </div>
+                <div className="flex items-center justify-center mt-2">
+                    <div className="w-full max-w-lg flex justify-center">
+                    <button type="button" onClick={() => { console.log('toggle category totals'); setShowCategoryTotals((s) => !s) }} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100">Show Category Totals</button>
+                  </div>
+                </div>
+                {showCategoryTotals && (
+                  <div className="mt-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Category totals (including tax)</h4>
+                      <button onClick={() => setShowCategoryTotals(false)} className="text-xl text-red-500 hover:text-red-400 px-2 py-1 rounded" aria-label="Close category totals">✕</button>
+                    </div>
+                    {!(totals && totals.categoryTotals && totals.categoryTotals.length > 0) ? (
+                      <div className="text-sm text-gray-500">No items to summarize.</div>
+                    ) : (
+                      <div className="overflow-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-gray-600 dark:text-gray-300">
+                              <th className="pb-2">Category</th>
+                              <th className="pb-2 text-right">Subtotal</th>
+                              <th className="pb-2 text-right">Tax</th>
+                              <th className="pb-2 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(totals?.categoryTotals ?? []).map((c) => (
+                              <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                                <td className="py-2 text-gray-800 dark:text-gray-200">{c.name}</td>
+                                <td className="py-2 text-right text-gray-700 dark:text-gray-300">${c.subtotal.toFixed(2)}</td>
+                                <td className="py-2 text-right text-gray-700 dark:text-gray-300">${c.tax.toFixed(2)}</td>
+                                <td className="py-2 text-right font-semibold text-gray-900 dark:text-white">${c.total.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
