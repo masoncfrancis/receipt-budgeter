@@ -55,6 +55,189 @@ async function getAccountsFromActual() {
 }
 
 /**
+ * Ensure the configured budget file is downloaded and the Actual API is synced.
+ * No-op in TEST_DATA_ENABLED mode.
+ */
+async function ensureBudgetLoaded() {
+  if (process.env.TEST_DATA_ENABLED === 'true') return
+  if (process.env.ACTUAL_BUDGET_FILE_ID) {
+    await actualApi.downloadBudget(process.env.ACTUAL_BUDGET_FILE_ID)
+  }
+  await actualApi.sync()
+}
+
+/**
+ * Run the 3rd-party bank sync for the given account identifier.
+ * Signature: runBankSync({ stringaccountId }) => Promise<void>
+ */
+async function runBankSync({ stringaccountId, ignoreErrors = false } = {}) {
+  try {
+    // Optionally attach global handlers early to catch async errors
+    let uncaughtHandler, unhandledRejectionHandler
+    let swallowed = false
+    if (ignoreErrors) {
+      uncaughtHandler = (err) => {
+        swallowed = true
+        console.error('runBankSync uncaughtException (ignored):', err)
+      }
+      unhandledRejectionHandler = (reason) => {
+        swallowed = true
+        console.error('runBankSync unhandledRejection (ignored):', reason)
+      }
+      process.on('uncaughtException', uncaughtHandler)
+      process.on('unhandledRejection', unhandledRejectionHandler)
+    }
+    if (!stringaccountId) {
+      if (ignoreErrors) {
+        console.warn('runBankSync called without stringaccountId (ignored)')
+        return
+      }
+      throw new Error('stringaccountId is required')
+    }
+
+    await initActual()
+    try {
+      await ensureBudgetLoaded()
+    } catch (e) {
+      if (ignoreErrors) {
+        console.error('ensureBudgetLoaded failed (ignored):', e)
+      } else {
+        throw e
+      }
+    }
+    if (!actualApi.runBankSync) {
+      await shutdownActualQuiet()
+      const err = new Error('actualApi.runBankSync not implemented')
+      if (ignoreErrors) {
+        console.error(err)
+        return
+      }
+      throw err
+    }
+
+    try {
+      await actualApi.runBankSync({ accountId: stringaccountId })
+    } catch (e) {
+      if (ignoreErrors) {
+        console.error('runBankSync failed (ignored):', e)
+        swallowed = true
+      } else {
+        throw e
+      }
+    }
+  } catch (err) {
+    if (ignoreErrors) {
+      console.error('runBankSync caught and ignored error:', err)
+      return
+    }
+    throw err
+  } finally {
+    // Remove any attached global handlers first
+    try {
+      if (ignoreErrors) {
+        try { process.removeListener('uncaughtException', uncaughtHandler) } catch (er) {}
+        try { process.removeListener('unhandledRejection', unhandledRejectionHandler) } catch (er) {}
+      }
+    } catch (er) {
+      // ignore
+    }
+
+    try {
+      await shutdownActualQuiet()
+    } catch (e) {
+      // already shutting down quietly
+    }
+  }
+}
+
+/**
+ * Get transactions for an account between date strings (inclusive).
+ * Signature: getTransactions(accountId, datestartDate, dateendDate) => Promise<Transaction[]>
+ */
+async function getTransactions(accountId, datestartDate, dateendDate) {
+  if (!accountId) throw new Error('accountId is required')
+  await initActual()
+  try {
+    await ensureBudgetLoaded()
+  } catch (e) {
+    // propagate as normal error to caller
+    await shutdownActualQuiet()
+    throw e
+  }
+  try {
+    if (!actualApi.getTransactions) {
+      throw new Error('actualApi.getTransactions not implemented')
+    }
+    const txs = await actualApi.getTransactions(accountId, datestartDate, dateendDate)
+    return Array.isArray(txs) ? txs : []
+  } finally {
+    await shutdownActualQuiet()
+  }
+}
+
+/**
+ * Import transactions via Actual API importTransactions, which processes rules and avoids duplicates.
+ * Signature: importTransactions(idaccountId, Transaction[]transactions) => Promise<{ errors, added, updated }>
+ */
+async function importTransactions(accountId, transactions) {
+  if (!accountId) throw new Error('accountId is required')
+  if (!Array.isArray(transactions)) throw new Error('transactions must be an array')
+  await initActual()
+  try {
+    await ensureBudgetLoaded()
+  } catch (e) {
+    await shutdownActualQuiet()
+    throw e
+  }
+  try {
+    if (!actualApi.importTransactions) {
+      throw new Error('actualApi.importTransactions not implemented')
+    }
+    // Log payload for debugging (helps trace import failures)
+    try {
+      console.log('importTransactions -> accountId:', accountId, 'transactions:', JSON.stringify(transactions, null, 2))
+    } catch (e) {
+      console.log('importTransactions -> accountId:', accountId, 'transactions: [unserializable]')
+    }
+    const result = await actualApi.importTransactions(accountId, transactions)
+    return result
+  } finally {
+    await shutdownActualQuiet()
+  }
+}
+
+  /**
+   * Add transactions via Actual API addTransactions (raw add, no reconcile).
+   * Signature: addTransactions(idaccountId, Transaction[]transactions, bool?runTransfers = false, bool?learnCategories = false) => Promise<id[]>
+   */
+  async function addTransactions(accountId, transactions, runTransfers = false, learnCategories = false) {
+    if (!accountId) throw new Error('accountId is required')
+    if (!Array.isArray(transactions)) throw new Error('transactions must be an array')
+    await initActual()
+    try {
+      await ensureBudgetLoaded()
+    } catch (e) {
+      await shutdownActualQuiet()
+      throw e
+    }
+    try {
+      if (!actualApi.addTransactions) {
+        throw new Error('actualApi.addTransactions not implemented')
+      }
+      // Log payload for debugging
+      try {
+        console.log('addTransactions -> accountId:', accountId, 'transactions:', JSON.stringify(transactions, null, 2), 'runTransfers:', runTransfers, 'learnCategories:', learnCategories)
+      } catch (e) {
+        console.log('addTransactions -> accountId:', accountId, 'transactions: [unserializable]')
+      }
+      const result = await actualApi.addTransactions(accountId, transactions, runTransfers, learnCategories)
+      return result
+    } finally {
+      await shutdownActualQuiet()
+    }
+  }
+
+/**
  * Main function used by routes: returns { availableCategories, accounts }
  * Honors TEST_DATA_ENABLED environment variable (string 'true').
  */
@@ -103,4 +286,8 @@ module.exports = {
   getBudgetInformation,
   getCategoriesFromActual,
   getAccountsFromActual,
+  runBankSync,
+  getTransactions,
+  importTransactions,
+  addTransactions,
 }

@@ -14,6 +14,9 @@ export default function ReceiptForm() {
   const [accountId, setAccountId] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'upload' | 'results'>('upload')
+   const [createTransactions, setCreateTransactions] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [availableCategories, setAvailableCategories] = useState<Category[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgetInfoLoading, setBudgetInfoLoading] = useState<boolean>(true)
@@ -105,11 +108,73 @@ export default function ReceiptForm() {
     setItems(next.length > 0 ? next : null)
   }
 
-  const handleSave = () => {
-    // For now just log the final payload — in real app we'd POST this to server
-    const payload = { accountId: accountId || null, items }
-    console.log('Saving receipt', payload)
-    alert(`Receipt saved (mock). Account: ${accountId || 'not selected'}. Check console for payload.`)
+  const handleSave = async () => {
+    if (!accountId) {
+      alert('Please select an account before saving')
+      return
+    }
+
+    // Aggregate splits from current items (include taxes applied)
+    const categoryMap: Record<string, { id: string; name: string; amount: number }> = {}
+    if (items) {
+      for (const it of items) {
+        const catId = (it as any).budgetCategory || 'uncategorized'
+        const catName = (it as any).budgetCategoryName || catId
+        const price = typeof it.price === 'number' ? it.price : 0
+        // compute item tax using localTaxRates if any
+        let itemTax = 0
+        const applied = (it as any).taxesApplied || []
+        for (const tid of applied) {
+          const tr = localTaxRates.find((r) => r.id === tid)
+          if (tr && typeof tr.rate === 'number' && tr.enabled !== false) {
+            itemTax += Math.round(price * tr.rate * 100) / 100
+          }
+        }
+        const totalForItem = price + itemTax
+        if (!categoryMap[catId]) categoryMap[catId] = { id: catId, name: catName, amount: 0 }
+        categoryMap[catId].amount += totalForItem
+      }
+    }
+
+    const splits = Object.values(categoryMap).map((c) => ({ categoryId: c.id, amount: Math.round(c.amount * 100) / 100, description: c.name }))
+
+    const payload: any = {
+      accountId,
+      merchantName: receiptData?.storeName || undefined,
+      merchantLocation: receiptData?.storeLocation || undefined,
+      subtotal: totals?.subtotal,
+      tax: totals?.receiptTaxAmount ?? undefined,
+      total: totals?.total,
+      splits,
+      createTransactions: createTransactions,
+    }
+
+    setSubmitError(null)
+    try {
+      const resp = await fetch(`${BACKEND_URL}/submitReceipt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await resp.json()
+      if (!resp.ok) {
+        console.error('Submit failed', data)
+        setSubmitError(typeof data === 'string' ? data : (data.error || JSON.stringify(data)))
+        return
+      }
+      console.log('Submit response', data)
+      const successMsg = 'Receipt submitted: ' + (data.id || JSON.stringify(data))
+      setSubmitSuccess(successMsg)
+      setSubmitError(null)
+      // reset view but keep success banner
+      setItems(null)
+      setFile(null)
+      setReceiptData(null)
+      setView('upload')
+    } catch (err) {
+      console.error('Submit error', err)
+      setSubmitError(String(err))
+    }
   }
 
   // Initialize local tax rates when receiptData changes
@@ -121,6 +186,13 @@ export default function ReceiptForm() {
       setLocalTaxRates([])
     }
   }, [receiptData])
+
+  // Auto-dismiss success message after a short delay
+  useEffect(() => {
+    if (!submitSuccess) return
+    const t = setTimeout(() => setSubmitSuccess(null), 8000)
+    return () => clearTimeout(t)
+  }, [submitSuccess])
 
   const addTaxRate = () => {
     if (!newTaxName) return
@@ -240,6 +312,11 @@ export default function ReceiptForm() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Receipt Budgeter</h1>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Upload a photo of your receipt and we'll help you put it in the budget</p>
           </div>
+                  {submitSuccess && (
+                    <div className="mb-4 text-center">
+                      <div className="inline-block bg-emerald-100 text-emerald-800 px-4 py-2 rounded-md">{submitSuccess}</div>
+                    </div>
+                  )}
 
           <div className="space-y-8">
             {view === 'upload' ? (
@@ -490,6 +567,21 @@ export default function ReceiptForm() {
                 </div>
 
                 <div className="flex items-center justify-center mt-2">
+                  <div className="w-full max-w-lg flex justify-center">
+                    <label className="inline-flex items-center text-sm text-gray-700 dark:text-gray-200">
+                      <input type="checkbox" checked={createTransactions} onChange={(e) => setCreateTransactions(e.target.checked)} className="mr-2" />
+                      Create transaction in budget
+                    </label>
+                  </div>
+                </div>
+
+                {submitError && (
+                  <div className="flex items-center justify-center mt-2">
+                    <div className="w-full max-w-lg text-sm text-red-500 text-center">{submitError}</div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-center mt-2">
                   <div className="w-full max-w-lg flex flex-col sm:flex-row gap-4">
                     <button
                       type="button"
@@ -498,11 +590,12 @@ export default function ReceiptForm() {
                     >
                       Back
                     </button>
-                    <button className="flex-1 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-semibold shadow" onClick={handleSave}>
+                    <button type="button" className="flex-1 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-semibold shadow" onClick={handleSave}>
                       Save to Budget
                     </button>
                   </div>
                 </div>
+                
                 <div className="flex items-center justify-center mt-2">
                     <div className="w-full max-w-lg flex justify-center">
                     <button type="button" onClick={() => { console.log('toggle category totals'); setShowCategoryTotals((s) => !s) }} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100">Show Category Totals</button>

@@ -335,8 +335,29 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
 
 // POST /submitReceipt
 // Accepts JSON body per OpenAPI `SubmitReceiptRequest` schema.
-router.post('/submitReceipt', function(req, res) {
+router.post('/submitReceipt', async function(req, res) {
   var body = req.body || {};
+
+  // Debug: log key incoming fields to help trace why import may be skipped
+  try {
+    console.log('/submitReceipt received:', JSON.stringify({ accountId: body.accountId, createTransactions: body.createTransactions, doBankSync: body.doBankSync, receiptDate: body.receiptDate, total: body.total, subtotal: body.subtotal, splitsCount: Array.isArray(body.splits) ? body.splits.length : 0 }, null, 2))
+  } catch (e) {
+    console.log('/submitReceipt received: [unserializable body]')
+  }
+
+  // Always log splits and computed totals (helps debug when createTransactions is false)
+  try {
+    const splitsSummary = (body.splits || []).map(s => ({ categoryId: s.categoryId, amount: Number(s.amount) }))
+    // compute expected total (prefer total, otherwise subtotal+tax, otherwise subtotal)
+    let expectedTotal = null
+    if (typeof body.total === 'number') expectedTotal = body.total
+    else if (typeof body.subtotal === 'number' && typeof body.tax === 'number') expectedTotal = body.subtotal + body.tax
+    else if (typeof body.subtotal === 'number') expectedTotal = body.subtotal
+    console.log('/submitReceipt splits summary:', JSON.stringify(splitsSummary, null, 2))
+    console.log('/submitReceipt computed expectedTotal:', expectedTotal)
+  } catch (e) {
+    console.log('/submitReceipt splits summary: [unserializable]')
+  }
 
   if (!body.accountId) {
     return res.status(400).json({ error: 'accountId is required' });
@@ -345,12 +366,130 @@ router.post('/submitReceipt', function(req, res) {
     return res.status(400).json({ error: 'splits (non-empty array) is required' });
   }
 
-  // Optional: validate splits sum matches subtotal (if subtotal provided)
-  if (typeof body.subtotal === 'number') {
-    var sum = body.splits.reduce(function(acc, s) { return acc + (Number(s.amount) || 0); }, 0);
-    // Allow small floating point tolerance
-    if (Math.abs(sum - body.subtotal) > 0.01) {
-      return res.status(400).json({ error: 'splits must sum to subtotal', subtotal: body.subtotal, splitsTotal: sum });
+  // Optional: validate splits sum matches the receipt total (prefer explicit `total`, otherwise `subtotal+tax`, otherwise `subtotal`).
+  let expectedTotal = null
+  if (typeof body.total === 'number') {
+    expectedTotal = body.total
+  } else if (typeof body.subtotal === 'number' && typeof body.tax === 'number') {
+    expectedTotal = body.subtotal + body.tax
+  } else if (typeof body.subtotal === 'number') {
+    expectedTotal = body.subtotal
+  }
+  if (expectedTotal !== null) {
+    const sum = body.splits.reduce(function(acc, s) { return acc + (Number(s.amount) || 0); }, 0);
+    if (Math.abs(sum - expectedTotal) > 0.01) {
+      return res.status(400).json({ error: 'splits must sum to receipt total', expectedTotal: expectedTotal, splitsTotal: sum });
+    }
+  }
+
+  // In a real app you'd persist the transaction and generate an id.
+  // Optionally run a bank sync and look for an existing matching transaction
+  const doBankSync = body.doBankSync !== false; // default true per OpenAPI
+  if (doBankSync) {
+    try {
+      await budgetService.runBankSync({ stringaccountId: body.accountId, ignoreErrors: true })
+    } catch (err) {
+      // Shouldn't throw when ignoreErrors is true, but log and continue if it does
+      console.error('Bank sync failed (continuing):', err)
+    }
+  }
+
+  // Determine date range for matching transactions
+  const receiptDateStr = body.receiptDate || new Date().toISOString().slice(0,10)
+  const receiptDate = new Date(receiptDateStr)
+  const start = new Date(receiptDate)
+  start.setDate(start.getDate() - 1)
+  const end = new Date(receiptDate)
+  end.setDate(end.getDate() + 1)
+  const fmt = (d) => d.toISOString().slice(0,10)
+
+  let existingTxs = []
+  try {
+    existingTxs = await budgetService.getTransactions(body.accountId, fmt(start), fmt(end))
+  } catch (err) {
+    console.error('Failed to fetch transactions for matching:', err)
+    // Fall through; we don't want to block submission if lookup fails
+    existingTxs = []
+  }
+
+  // Try to find a matching transaction by amount and (optionally) payee/imported_payee/imported_id
+  const targetAmount = (typeof body.total === 'number') ? body.total : (typeof body.subtotal === 'number' ? body.subtotal : null)
+  const merchant = (body.merchantName || '').toLowerCase()
+  if (targetAmount !== null && Array.isArray(existingTxs) && existingTxs.length > 0) {
+    for (const tx of existingTxs) {
+      try {
+        const txAmount = Number(tx.amount)
+        if (!Number.isNaN(txAmount) && Math.abs(txAmount - targetAmount) < 0.02) {
+          // amount matches within tolerance; also try matching payee/merchant if available
+          const payeeName = (tx.payee_name || tx.imported_payee || '').toLowerCase()
+          const importedId = tx.imported_id || tx.importedId || ''
+          if (!merchant || (payeeName && payeeName.includes(merchant)) || (body.importedId && importedId === body.importedId)) {
+            if (body.createTransactions === true) {
+              console.log('/submitReceipt matched existing transaction but createTransactions=true; proceeding to import. matched tx id:', tx.id)
+              // continue to import below
+            } else {
+              console.log('/submitReceipt matched existing transaction, skipping import. matched tx id:', tx.id)
+              return res.json({ ok: true, id: tx.id, existing: true, matchedTransaction: tx })
+            }
+          }
+        }
+      } catch (e) {
+        // ignore per-transaction parse errors
+      }
+    }
+  }
+
+  // If requested, create the transaction in Actual using importTransactions
+  if (body.createTransactions === true) {
+    // Build a split transaction using the provided splits (already validated)
+    const importId = body.importedId || ('rcpt_import_' + Date.now().toString(36))
+    const txDate = body.receiptDate || new Date().toISOString().slice(0,10)
+    const totalAmount = (typeof body.total === 'number') ? body.total : ((typeof body.subtotal === 'number' && typeof body.tax === 'number') ? (body.subtotal + body.tax) : (typeof body.subtotal === 'number' ? body.subtotal : null))
+
+    // Actual API expects integer amounts (minor units). Convert dollars to cents.
+    // Build notes to include merchant name and location plus any existing notes.
+    const merchantName = body.merchantName || ''
+    const merchantLocation = body.merchantLocation || ''
+    const merchantInfo = [merchantName, merchantLocation].filter(Boolean).join(' — ')
+    let combinedNotes = ''
+    if (merchantInfo) combinedNotes = merchantInfo
+    if (body.notes) combinedNotes = combinedNotes ? (combinedNotes + '\n' + body.notes) : body.notes
+
+    const parentTx = {
+      account: body.accountId,
+      date: txDate,
+      amount: (typeof totalAmount === 'number') ? Math.round(totalAmount * 100) : undefined,
+      // Explicitly send `payee: null` to avoid providing an existing payee id;
+      // keep `payee_name` so Actual can create or match a payee by name.
+      payee: null,
+      payee_name: body.merchantName || undefined,
+      // Preserve the raw imported description
+      imported_payee: body.merchantName || undefined,
+      imported_id: importId,
+      notes: combinedNotes || undefined,
+      subtransactions: body.splits.map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description }))
+    }
+
+    try {
+      console.log('/submitReceipt importing transactions for account:', body.accountId)
+      try {
+        // Log a human-readable summary of the splits (categoryId and amount in dollars)
+        try {
+          const splitsSummary = (body.splits || []).map(s => ({ categoryId: s.categoryId, amount: Number(s.amount) }))
+          console.log('/submitReceipt splits summary:', JSON.stringify(splitsSummary, null, 2))
+        } catch (e) {
+          console.log('/submitReceipt splits summary: [unserializable]')
+        }
+        console.log('/submitReceipt import payload:', JSON.stringify([parentTx], null, 2))
+      } catch (e) {
+        console.log('/submitReceipt import payload: [unserializable]')
+      }
+      const addedIds = await budgetService.addTransactions(body.accountId, [parentTx], /*runTransfers=*/false, /*learnCategories=*/false)
+      try { console.log('/submitReceipt addTransactions result (ids):', JSON.stringify(addedIds, null, 2)) } catch (e) { console.log('/submitReceipt addTransactions result: [unserializable]') }
+      return res.json({ ok: true, id: importId, addedIds })
+    } catch (err) {
+      console.error('Import transactions failed:', err)
+      return res.status(500).json({ error: 'Failed to create transaction', details: String(err) })
     }
   }
 
