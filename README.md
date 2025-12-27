@@ -125,7 +125,6 @@ npx serve -s dist
 ## Development Notes & Tips
 - If you're prototyping without an Actual server, set `TEST_DATA_ENABLED=true` in `server/.env.local` to avoid needing Actual or Google Gemini credentials.
 - The server creates (or expects) an `actualcache` directory in its working directory to store cached Actual API data; this is created automatically when the server starts.
-- For Google GenAI make sure your service account has appropriate permissions and your environment points to the credentials with `GOOGLE_APPLICATION_CREDENTIALS`.
 
 ## Troubleshooting
 - If `GET /getBudgetInformation` fails with `ACTUAL_SERVER_URL not configured`, ensure the server env file includes `ACTUAL_SERVER_URL` or enable `TEST_DATA_ENABLED` for testing.
