@@ -50,6 +50,50 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "/status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{SERVER_BASE_URL}}/status",
+					"host": [
+						"{{SERVER_BASE_URL}}"
+					],
+					"path": [
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "/searchTransactions",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{SERVER_BASE_URL}}/searchTransactions?transactionDate=&accountId=",
+					"host": [
+						"{{SERVER_BASE_URL}}"
+					],
+					"path": [
+						"searchTransactions"
+					],
+					"query": [
+						{
+							"key": "transactionDate",
+							"value": ""
+						},
+						{
+							"key": "accountId",
+							"value": ""
+						}
+					]
+				}
+			},
+			"response": []
 		}
 	]
 }
