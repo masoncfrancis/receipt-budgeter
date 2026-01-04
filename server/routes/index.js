@@ -500,6 +500,51 @@ router.post('/submitReceipt', async function(req, res) {
 
 
 // health check endpoint
+// Search for transactions that may match a receipt
+// Query parameters: `transactionDate` (YYYY-MM-DD) and `accountId`
+router.get('/searchTransactions', async function(req, res) {
+  const transactionDate = req.query.transactionDate || req.query.date || null;
+  const accountId = req.query.accountId || req.query.account || null;
+
+  if (!transactionDate || !accountId) {
+    return res.status(400).json({ error: 'transactionDate and accountId query parameters are required' });
+  }
+
+  // Build an inclusive date range: 1 day before and 4 days after the provided date
+  try {
+    const parsed = new Date(transactionDate);
+    if (isNaN(parsed.getTime())) {
+      return res.status(400).json({ error: 'transactionDate must be a valid date (YYYY-MM-DD)' });
+    }
+    const start = new Date(parsed);
+    start.setDate(start.getDate() - 1);
+    const end = new Date(parsed);
+    end.setDate(end.getDate() + 4);
+    const fmt = (d) => d.toISOString().slice(0,10);
+
+    let txs = [];
+    try {
+      txs = await budgetService.getTransactions(accountId, fmt(start), fmt(end));
+    } catch (err) {
+      console.error('searchTransactions: failed to get transactions:', err);
+      return res.status(500).json({ error: 'Failed to fetch transactions', details: String(err) });
+    }
+
+    const results = (Array.isArray(txs) ? txs : []).map((tx) => ({
+      date: tx.date || null,
+      transactionId: tx.id || null,
+      accountId: tx.account || accountId,
+      payeeName: tx.payee_name || tx.imported_payee || tx.payee || '',
+      notes: tx.notes || ''
+    }));
+
+    return res.json(results);
+  } catch (err) {
+    console.error('searchTransactions handler error:', err);
+    return res.status(500).json({ error: 'Internal server error', details: String(err) });
+  }
+});
+
 router.get('/status', function(req, res) {
   res.json({ status: 'ok' });
 });

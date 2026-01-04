@@ -136,6 +136,57 @@ paths:
                   value:
                     ok: true
                     id: "abc123"
+  
+  /searchTransactions:
+    get:
+      summary: Search for matching transactions by date and account
+      description: |
+        Search for transactions that might match a receipt. The server searches
+        an inclusive date window starting 1 day before the provided
+        `transactionDate` and extending 4 days after it (i.e. from
+        `transactionDate - 1 day` through `transactionDate + 4 days`).
+      operationId: searchTransactions
+      parameters:
+        - in: query
+          name: transactionDate
+          required: true
+          schema:
+            type: string
+            format: date
+          description: |
+            Date of the transaction to search for (YYYY-MM-DD). The search
+            will include an inclusive window from 1 day before to 4 days after
+            this date.
+        - in: query
+          name: accountId
+          required: true
+          schema:
+            type: string
+          description: Account identifier to search within
+      responses:
+        '200':
+          description: List of matching transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchedTransaction'
+              examples:
+                example-1:
+                  summary: Example matching transactions
+                  value:
+                    - date: "2025-10-01"
+                      transactionId: "tx_abc123"
+                      accountId: "checking"
+                      payeeName: "Corner Grocery"
+                      notes: "Imported from POS"
+                    - date: "2025-10-01"
+                      transactionId: "tx_def456"
+                      accountId: "checking"
+                      payeeName: "Coffee Shop"
+                      notes: "Card ending 1234"
+      
 
 components:
   schemas:
@@ -272,6 +323,29 @@ components:
       required:
         - name
         - price
+    SearchedTransaction:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Transaction date (YYYY-MM-DD)
+        transactionId:
+          type: string
+          description: Unique transaction identifier
+        accountId:
+          type: string
+          description: Account identifier the transaction belongs to
+        payeeName:
+          type: string
+          description: Payee or merchant name
+        notes:
+          type: string
+          description: Additional notes or imported payee details
+      required:
+        - date
+        - transactionId
+        - accountId
     Split:
       type: object
       properties:
