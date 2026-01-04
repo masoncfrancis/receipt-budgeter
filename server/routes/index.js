@@ -418,7 +418,8 @@ router.post('/submitReceipt', async function(req, res) {
   if (targetAmount !== null && Array.isArray(existingTxs) && existingTxs.length > 0) {
     for (const tx of existingTxs) {
       try {
-        const txAmount = Number(tx.amount)
+        const rawAmount = tx.amount
+        const txAmount = (rawAmount !== undefined && rawAmount !== null && !Number.isNaN(Number(rawAmount))) ? (Number(rawAmount) / 100) : NaN
         if (!Number.isNaN(txAmount) && Math.abs(txAmount - targetAmount) < 0.02) {
           // amount matches within tolerance; also try matching payee/merchant if available
           const payeeName = (tx.payee_name || tx.imported_payee || '').toLowerCase()
@@ -535,7 +536,8 @@ router.get('/searchTransactions', async function(req, res) {
       transactionId: tx.id || null,
       accountId: tx.account || accountId,
       payeeName: tx.payee_name || tx.imported_payee || tx.payee || '',
-      notes: tx.notes || ''
+      notes: tx.notes || '',
+      amountPaid: (tx.amount !== undefined && tx.amount !== null && !Number.isNaN(Number(tx.amount))) ? Number((Number(tx.amount) / 100).toFixed(2)) : null
     }));
 
     return res.json(results);

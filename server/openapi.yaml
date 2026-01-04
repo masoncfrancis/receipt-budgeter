@@ -181,11 +181,13 @@ paths:
                       accountId: "checking"
                       payeeName: "Corner Grocery"
                       notes: "Imported from POS"
+                      amountPaid: 94.71
                     - date: "2025-10-01"
                       transactionId: "tx_def456"
                       accountId: "checking"
                       payeeName: "Coffee Shop"
                       notes: "Card ending 1234"
+                      amountPaid: 4.50
       
 
 components:
@@ -342,10 +344,15 @@ components:
         notes:
           type: string
           description: Additional notes or imported payee details
+        amountPaid:
+          type: number
+          format: float
+          description: Amount paid for the transaction (in dollars)
       required:
         - date
         - transactionId
         - accountId
+        - amountPaid
     Split:
       type: object
       properties:
