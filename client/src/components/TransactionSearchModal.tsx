@@ -29,7 +29,10 @@ export default function TransactionSearchModal({ open, onClose, loading, transac
               transactions.map((tx) => (
                 <div key={tx.transactionId} className="p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">{tx.payeeName || 'Unknown'}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium text-gray-900 dark:text-white">{tx.payeeName || 'Unknown'}</div>
+                      <div className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200">{tx.isPayment ? 'Payment' : 'Refund'}</div>
+                    </div>
                     <div className="text-sm text-gray-500">{tx.date} — ${tx.amountPaid?.toFixed(2) ?? '0.00'}</div>
                     {tx.notes && <div className="text-xs text-gray-400 truncate max-w-md">{tx.notes}</div>}
                   </div>

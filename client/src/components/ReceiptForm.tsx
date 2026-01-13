@@ -537,6 +537,66 @@ export default function ReceiptForm() {
                           alert('Please select an account before searching for matching transactions')
                           return
                         }
+
+                        // Build splits aggregated by category (include tax where computed)
+                        const splits = (() => {
+                          if (!items || items.length === 0) return []
+                          if (totals && totals.categoryTotals && totals.categoryTotals.length > 0) {
+                            return (totals.categoryTotals || []).map((c) => ({
+                              amount: Number((c.total || 0).toFixed(2)),
+                              categoryId: c.id === 'uncategorized' ? undefined : c.id,
+                              description: c.name,
+                            }))
+                          }
+                          // Fallback: sum items by category
+                          const map: Record<string, { amount: number; categoryId?: string; description?: string }> = {}
+                          for (const it of items) {
+                            const catId = it.budgetCategory || 'uncategorized'
+                            if (!map[catId]) map[catId] = { amount: 0, categoryId: it.budgetCategory, description: it.budgetCategoryName || 'Uncategorized' }
+                            map[catId].amount += (it.price || 0)
+                          }
+                          return Object.values(map).map((m) => ({ amount: Number(m.amount.toFixed(2)), categoryId: m.categoryId, description: m.description }))
+                        })()
+
+                        // If user requested creation, submit immediately to create a new transaction
+                        if (createTransactions) {
+                          setSubmitError(null)
+                          try {
+                            const payload = {
+                              accountId,
+                              createTransactions: true,
+                              receiptDate: (receiptData && (receiptData.receiptDate || (receiptData as any).date)) || new Date().toISOString().slice(0,10),
+                              merchantName: receiptData?.storeName || undefined,
+                              merchantLocation: receiptData?.storeLocation || undefined,
+                              notes: undefined,
+                              splits,
+                              total: totals?.total
+                            }
+                            const resp = await fetch(`${BACKEND_URL}/applyTransaction`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(payload),
+                            })
+                            if (!resp.ok) {
+                              const txt = await resp.text()
+                              setSubmitError('Create failed: ' + resp.status + ' ' + txt)
+                            } else {
+                              await resp.json()
+                              setSubmitSuccess('Transaction created')
+                              // reset form
+                              setItems(null)
+                              setFile(null)
+                              setReceiptData(null)
+                              setView('upload')
+                            }
+                          } catch (err) {
+                            console.error('Create error', err)
+                            setSubmitError(String(err))
+                          }
+                          return
+                        }
+
+                        // Otherwise, open the search modal
                         // Prefer the receipt's detected date if available, otherwise fallback to today
                         const dateStr = (receiptData && (receiptData.receiptDate || (receiptData as any).date)) || new Date().toISOString().slice(0,10)
                         setSubmitError(null)
@@ -561,7 +621,7 @@ export default function ReceiptForm() {
                         }
                       }}
                     >
-                      Search For Matching Transaction
+                      {createTransactions ? 'Submit Receipt' : 'Search For Matching Transaction'}
                     </button>
                   </div>
                 </div>
@@ -572,12 +632,78 @@ export default function ReceiptForm() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">Selected transaction: {selectedTransaction.payeeName || 'Unknown'}</div>
-                          <div className="text-xs text-gray-600">{selectedTransaction.date} — ${selectedTransaction.amountPaid?.toFixed(2) ?? '0.00'}</div>
+                          <div className="text-xs text-gray-600">{selectedTransaction.date} — ${selectedTransaction.amountPaid?.toFixed(2) ?? '0.00'} <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200">{selectedTransaction.isPayment ? 'Payment' : 'Refund'}</span></div>
                         </div>
                         <div>
                           <button onClick={() => setSelectedTransaction(null)} className="px-2 py-1 text-sm text-red-600">Clear</button>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+                {selectedTransaction && !createTransactions && (
+                  <div className="flex items-center justify-center mt-4">
+                    <div className="w-full max-w-lg">
+                      <button
+                        onClick={async () => {
+                          if (!accountId) { alert('Please select an account before applying'); return }
+                          setSubmitError(null)
+                          try {
+                            const splits = (() => {
+                              if (!items || items.length === 0) return []
+                              if (totals && totals.categoryTotals && totals.categoryTotals.length > 0) {
+                                return (totals.categoryTotals || []).map((c) => ({
+                                  amount: Number((c.total || 0).toFixed(2)),
+                                  categoryId: c.id === 'uncategorized' ? undefined : c.id,
+                                  description: c.name,
+                                }))
+                              }
+                              const map: Record<string, { amount: number; categoryId?: string; description?: string }> = {}
+                              for (const it of items) {
+                                const catId = it.budgetCategory || 'uncategorized'
+                                if (!map[catId]) map[catId] = { amount: 0, categoryId: it.budgetCategory, description: it.budgetCategoryName || 'Uncategorized' }
+                                map[catId].amount += (it.price || 0)
+                              }
+                              return Object.values(map).map((m) => ({ amount: Number(m.amount.toFixed(2)), categoryId: m.categoryId, description: m.description }))
+                            })()
+                            const payload = {
+                              accountId,
+                              createTransactions: false,
+                              receiptDate: (receiptData && (receiptData.receiptDate || (receiptData as any).date)) || new Date().toISOString().slice(0,10),
+                              merchantName: receiptData?.storeName || undefined,
+                              merchantLocation: receiptData?.storeLocation || undefined,
+                              notes: undefined,
+                              splits,
+                              selectedTransactionId: selectedTransaction.transactionId,
+                              selectedTransaction: selectedTransaction
+                            }
+                            const resp = await fetch(`${BACKEND_URL}/applyTransaction`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(payload),
+                            })
+                            if (!resp.ok) {
+                              const txt = await resp.text()
+                              setSubmitError('Apply failed: ' + resp.status + ' ' + txt)
+                            } else {
+                              await resp.json()
+                              setSubmitSuccess('Transaction updated')
+                              setSelectedTransaction(null)
+                              // optionally reset the form
+                              setItems(null)
+                              setFile(null)
+                              setReceiptData(null)
+                              setView('upload')
+                            }
+                          } catch (err) {
+                            console.error('Apply error', err)
+                            setSubmitError(String(err))
+                          }
+                        }}
+                        className="px-4 py-2 rounded-md bg-emerald-600 text-white"
+                      >
+                        Apply Selected Transaction
+                      </button>
                     </div>
                   </div>
                 )}

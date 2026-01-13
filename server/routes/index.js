@@ -477,7 +477,8 @@ router.post('/submitReceipt', async function(req, res) {
     const parentTx = {
       account: body.accountId,
       date: txDate,
-      amount: (typeof totalAmount === 'number') ? Math.round(totalAmount * 100) : undefined,
+      // parent amount should be negative for payments
+      amount: (typeof totalAmount === 'number') ? -Math.round(totalAmount * 100) : undefined,
       // Explicitly send `payee: null` to avoid providing an existing payee id;
       // keep `payee_name` so Actual can create or match a payee by name.
       payee: null,
@@ -486,7 +487,7 @@ router.post('/submitReceipt', async function(req, res) {
       imported_payee: body.merchantName || undefined,
       imported_id: importId,
       notes: combinedNotes || undefined,
-      subtransactions: body.splits.map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
+      subtransactions: body.splits.map((s) => ({ amount: -Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
     }
 
     try {
@@ -607,8 +608,8 @@ router.post('/applyTransaction', async function(req, res) {
     })()
 
     // Convert splits amounts (dollars) to minor units (cents) and map to API shape
-    // Include `account` and `date` on subtransactions so the Actual API has required fields
-    const subtransactions = (body.splits || []).map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
+    // Use negative amounts for payments. Include `account` and `date` on subtransactions so the Actual API has required fields
+    const subtransactions = (body.splits || []).map((s) => ({ amount: -Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
 
     
     if (!createTransactions) {
@@ -675,7 +676,8 @@ router.post('/applyTransaction', async function(req, res) {
       const parentTx = {
         account: body.accountId,
         date: txDate,
-        amount: (typeof totalAmount === 'number') ? Math.round(totalAmount * 100) : undefined,
+        // parent amount should be negative for payments
+        amount: (typeof totalAmount === 'number') ? -Math.round(totalAmount * 100) : undefined,
         payee: null,
         payee_name: merchantName || undefined,
         imported_payee: merchantName || undefined,

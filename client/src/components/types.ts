@@ -50,8 +50,10 @@ export type SearchedTransaction = {
   transactionId: string
   accountId: string
   payeeName?: string
+  payeeId?: string | null
   notes?: string
   amountPaid?: number | null
+  isPayment?: boolean
 }
 
 export type ParsedItem = {
