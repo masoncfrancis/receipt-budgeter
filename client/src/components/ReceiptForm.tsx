@@ -713,6 +713,7 @@ export default function ReceiptForm() {
                   onClose={() => setSearchModalOpen(false)}
                   loading={searchLoading}
                   transactions={searchResults}
+                  accountId={accountId}
                   onSelect={(tx) => { setSelectedTransaction(tx); setSearchModalOpen(false) }}
                 />
                 <div className="flex items-center justify-center mt-2">

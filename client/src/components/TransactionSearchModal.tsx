@@ -1,15 +1,54 @@
+import { useState, useEffect } from 'react'
 import type { SearchedTransaction } from './types'
 
 type Props = {
   open: boolean
   onClose: () => void
-  loading: boolean
-  transactions: SearchedTransaction[]
+  loading?: boolean
+  transactions?: SearchedTransaction[]
+  accountId: string
   onSelect: (tx: SearchedTransaction) => void
 }
 
-export default function TransactionSearchModal({ open, onClose, loading, transactions, onSelect }: Props) {
+export default function TransactionSearchModal({ open, onClose, loading = false, transactions = [], accountId, onSelect }: Props) {
+  const [localLoading, setLocalLoading] = useState(false)
+  const [localTransactions, setLocalTransactions] = useState<SearchedTransaction[]>(transactions || [])
+  const [dateStr, setDateStr] = useState<string>('')
+
+  useEffect(() => {
+    setLocalTransactions(transactions || [])
+  }, [transactions])
+
+  useEffect(() => {
+    if (!open) return
+    setDateStr('')
+  }, [open])
+
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
+
+  const doSearch = async (d?: string) => {
+    if (!accountId) return
+    const searchDate = d || dateStr || ''
+    setLocalLoading(true)
+    try {
+      const resp = await fetch(`${BACKEND_URL}/searchTransactions?transactionDate=${encodeURIComponent(searchDate)}&accountId=${encodeURIComponent(accountId)}`)
+      if (!resp.ok) {
+        setLocalTransactions([])
+      } else {
+        const data = await resp.json()
+        setLocalTransactions(data || [])
+      }
+    } catch (e) {
+      console.error('Modal search error', e)
+      setLocalTransactions([])
+    } finally {
+      setLocalLoading(false)
+    }
+  }
+
   if (!open) return null
+
+  const effectiveLoading = localLoading || Boolean(loading)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -19,14 +58,21 @@ export default function TransactionSearchModal({ open, onClose, loading, transac
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select a matching transaction</h3>
           <button onClick={onClose} className="text-gray-600 hover:text-gray-800">✕</button>
         </div>
-        {loading ? (
+
+        <div className="mb-3 flex gap-2">
+          <input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} className="rounded border p-2 bg-white dark:bg-gray-800 text-sm" />
+          <button onClick={() => doSearch(dateStr)} className="px-3 py-2 bg-blue-600 text-white rounded">Search Date</button>
+          <button onClick={() => doSearch(new Date().toISOString().slice(0,10))} className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded">Today</button>
+        </div>
+
+        {effectiveLoading ? (
           <div className="py-8 text-center">Searching...</div>
         ) : (
           <div className="space-y-2 max-h-72 overflow-auto">
-            {transactions.length === 0 ? (
+            {localTransactions.length === 0 ? (
               <div className="py-8 text-center text-gray-600">No matching transactions found.</div>
             ) : (
-              transactions.map((tx) => (
+              localTransactions.map((tx) => (
                 <div key={tx.transactionId} className="p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center">
                   <div>
                     <div className="flex items-center gap-2">
@@ -44,6 +90,7 @@ export default function TransactionSearchModal({ open, onClose, loading, transac
             )}
           </div>
         )}
+
         <div className="mt-4 flex justify-end">
           <button onClick={onClose} className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded">Close</button>
         </div>
