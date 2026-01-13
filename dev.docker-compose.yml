@@ -1,12 +1,26 @@
 services:
-  receipt-budgeter:
-    build: .
-    container_name: receipt-budgeter
+
+  client:
+    build: ./client
+    container_name: receipt-budgeter-client
     ports:
       - "3011:3011"
     env_file:
-      - ./.env
+      - ./client/.env.production
     restart: unless-stopped
+    depends_on:
+      - server
+
+
+  server:
+    build: ./server
+    container_name: receipt-budgeter-server
+    ports:
+      - "3010:3010"
+    env_file:
+      - ./server/.env.production
+    restart: unless-stopped
+
 
 
 # Remove this service if you have an Actual server already set up.

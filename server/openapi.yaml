@@ -180,13 +180,17 @@ paths:
                       transactionId: "tx_abc123"
                       accountId: "checking"
                       payeeName: "Corner Grocery"
+                      payeeId: null
                       notes: "Imported from POS"
+                      isPayment: true
                       amountPaid: 94.71
                     - date: "2025-10-01"
                       transactionId: "tx_def456"
                       accountId: "checking"
                       payeeName: "Coffee Shop"
+                      payeeId: null
                       notes: "Card ending 1234"
+                      isPayment: true
                       amountPaid: 4.50
       
 
@@ -345,6 +349,12 @@ components:
         payeeName:
           type: string
           description: Payee or merchant name
+        payeeId:
+          type: string
+          description: Optional payee id if available from Actual API
+        isPayment:
+          type: boolean
+          description: True if this transaction is a payment (negative amount)
         notes:
           type: string
           description: Additional notes or imported payee details
@@ -357,6 +367,39 @@ components:
         - transactionId
         - accountId
         - amountPaid
+
+  /applyTransaction:
+    post:
+      summary: Create or apply a transaction for a receipt
+      description: |
+        Create a new (possibly split) transaction in Actual, or apply the receipt
+        to an existing transaction by creating a replacement split transaction and deleting the original.
+      operationId: applyTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyTransactionRequest'
+      responses:
+        '200':
+          description: Apply/create operation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyTransactionResponse'
+              examples:
+                created:
+                  value:
+                    ok: true
+                    id: "rcpt_import_abc123"
+                    addedIds: ["t1", "t2"]
+                replaced:
+                  value:
+                    ok: true
+                    createdReplacement: true
+                    importResult: {}
+                    deletedId: "tx_abc123"
     Split:
       type: object
       properties:
@@ -410,5 +453,62 @@ components:
       required:
         - accountId
         - splits
+
+    ApplyTransactionRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+        createTransactions:
+          type: boolean
+          description: If true, create a new transaction; if false, apply to a selected existing transaction
+        receiptDate:
+          type: string
+          format: date
+        merchantName:
+          type: string
+        merchantLocation:
+          type: string
+        notes:
+          type: string
+        total:
+          type: number
+          format: float
+        subtotal:
+          type: number
+          format: float
+        tax:
+          type: number
+          format: float
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Split'
+        selectedTransactionId:
+          type: string
+        selectedTransaction:
+          $ref: '#/components/schemas/SearchedTransaction'
+      required:
+        - accountId
+        - splits
+
+    ApplyTransactionResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: string
+          description: Import id when a new transaction was created
+        addedIds:
+          type: array
+          items:
+            type: string
+        createdReplacement:
+          type: boolean
+        importResult:
+          type: object
+        deletedId:
+          type: string
 
   securitySchemes: {}
