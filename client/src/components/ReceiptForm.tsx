@@ -1,8 +1,9 @@
 import { useState, type ChangeEvent, useEffect, useMemo } from 'react'
 import { useOidc } from '../oidc'
-import type { ParsedItem, Category, Account, BudgetInformationResponse, AnalyzeReceiptResponse, ReceiptData } from './types'
+import type { ParsedItem, Category, Account, BudgetInformationResponse, AnalyzeReceiptResponse, ReceiptData, SearchedTransaction } from './types'
 import ReceiptItemRow from './ReceiptItemRow'
 import { v4 as uuidv4 } from 'uuid'
+import TransactionSearchModal from './TransactionSearchModal'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
@@ -24,6 +25,10 @@ export default function ReceiptForm() {
   const [newTaxName, setNewTaxName] = useState('')
   const [newTaxRateStr, setNewTaxRateStr] = useState('')
   const [showAddTaxInputs, setShowAddTaxInputs] = useState(false)
+  const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState<SearchedTransaction[]>([])
+  const [selectedTransaction, setSelectedTransaction] = useState<SearchedTransaction | null>(null)
 
   useEffect(() => {
     const fetchBudgetInformation = async () => {
@@ -108,74 +113,8 @@ export default function ReceiptForm() {
     setItems(next.length > 0 ? next : null)
   }
 
-  const handleSave = async () => {
-    if (!accountId) {
-      alert('Please select an account before saving')
-      return
-    }
-
-    // Aggregate splits from current items (include taxes applied)
-    const categoryMap: Record<string, { id: string; name: string; amount: number }> = {}
-    if (items) {
-      for (const it of items) {
-        const catId = (it as any).budgetCategory || 'uncategorized'
-        const catName = (it as any).budgetCategoryName || catId
-        const price = typeof it.price === 'number' ? it.price : 0
-        // compute item tax using localTaxRates if any
-        let itemTax = 0
-        const applied = (it as any).taxesApplied || []
-        for (const tid of applied) {
-          const tr = localTaxRates.find((r) => r.id === tid)
-          if (tr && typeof tr.rate === 'number' && tr.enabled !== false) {
-            itemTax += Math.round(price * tr.rate * 100) / 100
-          }
-        }
-        const totalForItem = price + itemTax
-        if (!categoryMap[catId]) categoryMap[catId] = { id: catId, name: catName, amount: 0 }
-        categoryMap[catId].amount += totalForItem
-      }
-    }
-
-    const splits = Object.values(categoryMap).map((c) => ({ categoryId: c.id, amount: Math.round(c.amount * 100) / 100, description: c.name }))
-
-    const payload: any = {
-      accountId,
-      merchantName: receiptData?.storeName || undefined,
-      merchantLocation: receiptData?.storeLocation || undefined,
-      subtotal: totals?.subtotal,
-      tax: totals?.receiptTaxAmount ?? undefined,
-      total: totals?.total,
-      splits,
-      createTransactions: createTransactions,
-    }
-
-    setSubmitError(null)
-    try {
-      const resp = await fetch(`${BACKEND_URL}/submitReceipt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await resp.json()
-      if (!resp.ok) {
-        console.error('Submit failed', data)
-        setSubmitError(typeof data === 'string' ? data : (data.error || JSON.stringify(data)))
-        return
-      }
-      console.log('Submit response', data)
-      const successMsg = 'Receipt submitted: ' + (data.id || JSON.stringify(data))
-      setSubmitSuccess(successMsg)
-      setSubmitError(null)
-      // reset view but keep success banner
-      setItems(null)
-      setFile(null)
-      setReceiptData(null)
-      setView('upload')
-    } catch (err) {
-      console.error('Submit error', err)
-      setSubmitError(String(err))
-    }
-  }
+  // Previously we had a save handler here that submitted the receipt to the backend.
+  // That flow is deferred while we allow users to choose a matching bank transaction.
 
   // Initialize local tax rates when receiptData changes
   useEffect(() => {
@@ -590,12 +529,66 @@ export default function ReceiptForm() {
                     >
                       Back
                     </button>
-                    <button type="button" className="flex-1 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-semibold shadow" onClick={handleSave}>
-                      Save to Budget
+                    <button
+                      type="button"
+                      className="flex-1 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow"
+                      onClick={async () => {
+                        if (!accountId) {
+                          alert('Please select an account before searching for matching transactions')
+                          return
+                        }
+                        // Prefer the receipt's detected date if available, otherwise fallback to today
+                        const dateStr = (receiptData && (receiptData.receiptDate || (receiptData as any).date)) || new Date().toISOString().slice(0,10)
+                        setSubmitError(null)
+                        setSearchLoading(true)
+                        setSearchModalOpen(true)
+                        try {
+                          const resp = await fetch(`${BACKEND_URL}/searchTransactions?transactionDate=${encodeURIComponent(dateStr)}&accountId=${encodeURIComponent(accountId)}`)
+                          if (!resp.ok) {
+                            console.error('Search failed', resp.status)
+                            setSearchResults([])
+                            setSubmitError('Search failed')
+                          } else {
+                            const data = await resp.json()
+                            setSearchResults(data || [])
+                          }
+                        } catch (err) {
+                          console.error('Search error', err)
+                          setSearchResults([])
+                          setSubmitError(String(err))
+                        } finally {
+                          setSearchLoading(false)
+                        }
+                      }}
+                    >
+                      Search For Matching Transaction
                     </button>
                   </div>
                 </div>
                 
+                {selectedTransaction && (
+                  <div className="flex items-center justify-center mt-4">
+                    <div className="w-full max-w-lg p-3 bg-blue-50 dark:bg-gray-800 border rounded text-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">Selected transaction: {selectedTransaction.payeeName || 'Unknown'}</div>
+                          <div className="text-xs text-gray-600">{selectedTransaction.date} — ${selectedTransaction.amountPaid?.toFixed(2) ?? '0.00'}</div>
+                        </div>
+                        <div>
+                          <button onClick={() => setSelectedTransaction(null)} className="px-2 py-1 text-sm text-red-600">Clear</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <TransactionSearchModal
+                  open={searchModalOpen}
+                  onClose={() => setSearchModalOpen(false)}
+                  loading={searchLoading}
+                  transactions={searchResults}
+                  onSelect={(tx) => { setSelectedTransaction(tx); setSearchModalOpen(false) }}
+                />
                 <div className="flex items-center justify-center mt-2">
                     <div className="w-full max-w-lg flex justify-center">
                     <button type="button" onClick={() => { console.log('toggle category totals'); setShowCategoryTotals((s) => !s) }} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 text-sm text-gray-800 dark:text-gray-100">Show Category Totals</button>

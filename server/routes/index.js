@@ -151,6 +151,8 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
             },
             subtotal: { type: Type.NUMBER },
             total: { type: Type.NUMBER },
+            // The date printed on the receipt (YYYY-MM-DD)
+            receiptDate: { type: Type.STRING },
             storeName: { type: Type.STRING },
             storeLocation: { type: Type.STRING },
             taxAmount: { type: Type.NUMBER },
@@ -166,7 +168,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
               }
             }
           },
-          propertyOrdering: ["items", "subtotal", "total", "storeName", "storeLocation", "taxAmount", "taxRates"]
+          propertyOrdering: ["items", "subtotal", "total", "receiptDate", "storeName", "storeLocation", "taxAmount", "taxRates"]
         }
       };
 

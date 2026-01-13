@@ -245,6 +245,10 @@ components:
     ReceiptData:
       type: object
       properties:
+        receiptDate:
+          type: string
+          format: date
+          description: Date printed on the receipt (YYYY-MM-DD)
         subtotal:
           type: number
         total:

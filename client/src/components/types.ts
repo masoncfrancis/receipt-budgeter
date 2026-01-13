@@ -15,6 +15,8 @@ export type BudgetInformationResponse = {
 
 export type ReceiptData = {
   subtotal?: number
+  // Date found on the receipt in YYYY-MM-DD format
+  receiptDate?: string
   total: number
   storeName?: string
   storeLocation?: string
@@ -41,6 +43,15 @@ export type AnalyzedItem = {
 export type AnalyzeReceiptResponse = {
   receiptData: ReceiptData
   items: AnalyzedItem[]
+}
+
+export type SearchedTransaction = {
+  date: string
+  transactionId: string
+  accountId: string
+  payeeName?: string
+  notes?: string
+  amountPaid?: number | null
 }
 
 export type ParsedItem = {
