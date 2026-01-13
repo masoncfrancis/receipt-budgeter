@@ -282,6 +282,55 @@ async function getBudgetInformation() {
   }
 }
 
+/**
+ * Update a transaction by id using the Actual API.
+ * Signature: updateTransaction(id, fields) => Promise<null>
+ */
+async function updateTransaction(id, fields) {
+  if (!id) throw new Error('id is required')
+  if (!fields || typeof fields !== 'object') throw new Error('fields object is required')
+  await initActual()
+  try {
+    await ensureBudgetLoaded()
+  } catch (e) {
+    await shutdownActualQuiet()
+    throw e
+  }
+  try {
+    if (!actualApi.updateTransaction) {
+      throw new Error('actualApi.updateTransaction not implemented')
+    }
+    const result = await actualApi.updateTransaction(id, fields)
+    return result
+  } finally {
+    await shutdownActualQuiet()
+  }
+}
+
+/**
+ * Delete a transaction by id using the Actual API.
+ * Signature: deleteTransaction(id) => Promise<null>
+ */
+async function deleteTransaction(id) {
+  if (!id) throw new Error('id is required')
+  await initActual()
+  try {
+    await ensureBudgetLoaded()
+  } catch (e) {
+    await shutdownActualQuiet()
+    throw e
+  }
+  try {
+    if (!actualApi.deleteTransaction) {
+      throw new Error('actualApi.deleteTransaction not implemented')
+    }
+    const result = await actualApi.deleteTransaction(id)
+    return result
+  } finally {
+    await shutdownActualQuiet()
+  }
+}
+
 module.exports = {
   getBudgetInformation,
   getCategoriesFromActual,
@@ -290,4 +339,6 @@ module.exports = {
   getTransactions,
   importTransactions,
   addTransactions,
+  updateTransaction,
+  deleteTransaction,
 }

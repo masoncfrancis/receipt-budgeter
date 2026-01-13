@@ -422,7 +422,9 @@ router.post('/submitReceipt', async function(req, res) {
       try {
         const rawAmount = tx.amount
         const txAmount = (rawAmount !== undefined && rawAmount !== null && !Number.isNaN(Number(rawAmount))) ? (Number(rawAmount) / 100) : NaN
-        if (!Number.isNaN(txAmount) && Math.abs(txAmount - targetAmount) < 0.02) {
+        // Only consider this a matching payment if it's a negative amount (payment); skip deposits
+        if (Number.isNaN(txAmount) || txAmount >= 0) continue
+        if (Math.abs(Math.abs(txAmount) - targetAmount) < 0.02) {
           // amount matches within tolerance; also try matching payee/merchant if available
           const payeeName = (tx.payee_name || tx.imported_payee || '').toLowerCase()
           const importedId = tx.imported_id || tx.importedId || ''
@@ -446,7 +448,21 @@ router.post('/submitReceipt', async function(req, res) {
   if (body.createTransactions === true) {
     // Build a split transaction using the provided splits (already validated)
     const importId = body.importedId || ('rcpt_import_' + Date.now().toString(36))
-    const txDate = body.receiptDate || new Date().toISOString().slice(0,10)
+    const txDate = (function() {
+      if (!body.receiptDate) return new Date().toISOString().slice(0,10)
+      const d = new Date(body.receiptDate)
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0,10)
+      // fallback: try to parse common US format mm/dd/yyyy[ hh:mm]
+      const m = body.receiptDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+      if (m) {
+        const mm = Number(m[1]) - 1
+        const dd = Number(m[2])
+        const yyyy = Number(m[3])
+        const ddObj = new Date(Date.UTC(yyyy, mm, dd))
+        if (!isNaN(ddObj.getTime())) return ddObj.toISOString().slice(0,10)
+      }
+      return new Date().toISOString().slice(0,10)
+    })()
     const totalAmount = (typeof body.total === 'number') ? body.total : ((typeof body.subtotal === 'number' && typeof body.tax === 'number') ? (body.subtotal + body.tax) : (typeof body.subtotal === 'number' ? body.subtotal : null))
 
     // Actual API expects integer amounts (minor units). Convert dollars to cents.
@@ -470,7 +486,7 @@ router.post('/submitReceipt', async function(req, res) {
       imported_payee: body.merchantName || undefined,
       imported_id: importId,
       notes: combinedNotes || undefined,
-      subtransactions: body.splits.map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description }))
+      subtransactions: body.splits.map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
     }
 
     try {
@@ -537,9 +553,12 @@ router.get('/searchTransactions', async function(req, res) {
       date: tx.date || null,
       transactionId: tx.id || null,
       accountId: tx.account || accountId,
-      payeeName: tx.payee_name || tx.imported_payee || tx.payee || '',
+      payeeName: tx.payee_name || tx.imported_payee || (typeof tx.payee === 'string' ? null : '') || (tx.payee_name ? tx.payee_name : (tx.imported_payee || '')),
+      payeeId: tx.payee || null,
       notes: tx.notes || '',
-      amountPaid: (tx.amount !== undefined && tx.amount !== null && !Number.isNaN(Number(tx.amount))) ? Number((Number(tx.amount) / 100).toFixed(2)) : null
+      // Treat only negative amounts as payments. Expose absolute amountPaid and isPayment flag.
+      isPayment: (tx.amount !== undefined && tx.amount !== null && !Number.isNaN(Number(tx.amount))) ? (Number(tx.amount) < 0) : false,
+      amountPaid: (tx.amount !== undefined && tx.amount !== null && !Number.isNaN(Number(tx.amount))) ? Number((Math.abs(Number(tx.amount)) / 100).toFixed(2)) : null
     }));
 
     return res.json(results);
@@ -548,6 +567,134 @@ router.get('/searchTransactions', async function(req, res) {
     return res.status(500).json({ error: 'Internal server error', details: String(err) });
   }
 });
+
+
+// POST /applyTransaction
+// Body: { accountId, createTransactions, receiptDate, merchantName, merchantLocation, notes, splits: [{ amount, categoryId, description }], selectedTransactionId }
+router.post('/applyTransaction', async function(req, res) {
+  const body = req.body || {}
+  try {
+    if (!body.accountId) return res.status(400).json({ error: 'accountId is required' })
+    const createTransactions = body.createTransactions === true
+
+    // Validate splits for both flows (create or update) — must be non-empty array
+    if (!Array.isArray(body.splits) || body.splits.length === 0) {
+      return res.status(400).json({ error: 'splits (non-empty array) is required' })
+    }
+
+    // Build combined notes
+    const merchantName = body.merchantName || ''
+    const merchantLocation = body.merchantLocation || ''
+    const merchantInfo = [merchantName, merchantLocation].filter(Boolean).join(' — ')
+    let combinedNotes = ''
+    if (merchantInfo) combinedNotes = merchantInfo
+    if (body.notes) combinedNotes = combinedNotes ? (combinedNotes + '\n' + body.notes) : body.notes
+
+    // Determine transaction date (used for parent and subtransactions)
+    const txDate = (function() {
+      if (!body.receiptDate) return new Date().toISOString().slice(0,10)
+      const d = new Date(body.receiptDate)
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0,10)
+      const m = body.receiptDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+      if (m) {
+        const mm = Number(m[1]) - 1
+        const dd = Number(m[2])
+        const yyyy = Number(m[3])
+        const ddObj = new Date(Date.UTC(yyyy, mm, dd))
+        if (!isNaN(ddObj.getTime())) return ddObj.toISOString().slice(0,10)
+      }
+      return new Date().toISOString().slice(0,10)
+    })()
+
+    // Convert splits amounts (dollars) to minor units (cents) and map to API shape
+    // Include `account` and `date` on subtransactions so the Actual API has required fields
+    const subtransactions = (body.splits || []).map((s) => ({ amount: Math.round(Number(s.amount) * 100), category: s.categoryId, notes: s.description, account: body.accountId, date: txDate }))
+
+    
+    if (!createTransactions) {
+      // Create a new split transaction mirroring the selected transaction's payee/notes,
+      // then delete the original transaction. The client should include `selectedTransaction`.
+      const txId = body.selectedTransactionId || body.transactionId || (body.selectedTransaction && body.selectedTransaction.transactionId)
+      const sel = body.selectedTransaction || null
+      if (!txId || !sel) return res.status(400).json({ error: 'selectedTransaction and selectedTransactionId are required when not creating a new transaction' })
+
+      try {
+        const importId = 'rcpt_replace_' + Date.now().toString(36)
+
+        // Compute parent total (sum of splits) in minor units
+        const parentAmountCents = subtransactions.reduce((acc, s) => acc + (s.amount || 0), 0)
+
+        const parentTx = {
+          account: body.accountId,
+          date: txDate,
+          amount: parentAmountCents,
+          payee: sel.payeeId || undefined,
+          payee_name: sel.payeeId ? undefined : (sel.payeeName || undefined),
+          imported_payee: sel.payeeName || undefined,
+          imported_id: importId,
+          notes: sel.notes || combinedNotes || undefined,
+          subtransactions: subtransactions,
+        }
+
+        // Use importTransactions to let Actual reconcile and avoid duplicates
+        const importResult = await budgetService.importTransactions(body.accountId, [parentTx])
+
+        // Attempt to delete the original transaction
+        try {
+          await budgetService.deleteTransaction(txId)
+        } catch (delErr) {
+          console.error('Failed to delete original transaction after import:', delErr)
+        }
+
+        return res.json({ ok: true, createdReplacement: true, importResult, deletedId: txId })
+      } catch (err) {
+        console.error('applyTransaction: create-replace failed', err)
+        return res.status(500).json({ error: 'Failed to replace transaction', details: String(err) })
+      }
+    }
+
+    // createTransactions === true -> create a new (possibly split) transaction
+    try {
+      const importId = body.importedId || ('rcpt_import_' + Date.now().toString(36))
+      const txDate = (function() {
+        if (!body.receiptDate) return new Date().toISOString().slice(0,10)
+        const d = new Date(body.receiptDate)
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0,10)
+        const m = body.receiptDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+        if (m) {
+          const mm = Number(m[1]) - 1
+          const dd = Number(m[2])
+          const yyyy = Number(m[3])
+          const ddObj = new Date(Date.UTC(yyyy, mm, dd))
+          if (!isNaN(ddObj.getTime())) return ddObj.toISOString().slice(0,10)
+        }
+        return new Date().toISOString().slice(0,10)
+      })()
+      const totalAmount = (typeof body.total === 'number') ? body.total : ((typeof body.subtotal === 'number' && typeof body.tax === 'number') ? (body.subtotal + body.tax) : (typeof body.subtotal === 'number' ? body.subtotal : null))
+
+      const parentTx = {
+        account: body.accountId,
+        date: txDate,
+        amount: (typeof totalAmount === 'number') ? Math.round(totalAmount * 100) : undefined,
+        payee: null,
+        payee_name: merchantName || undefined,
+        imported_payee: merchantName || undefined,
+        imported_id: importId,
+        notes: combinedNotes || undefined,
+        subtransactions: subtransactions,
+      }
+
+      const addedIds = await budgetService.addTransactions(body.accountId, [parentTx], /*runTransfers=*/false, /*learnCategories=*/false)
+      return res.json({ ok: true, id: importId, addedIds })
+    } catch (err) {
+      console.error('applyTransaction: create failed', err)
+      return res.status(500).json({ error: 'Failed to create transaction', details: String(err) })
+    }
+  } catch (err) {
+    console.error('applyTransaction handler error:', err)
+    return res.status(500).json({ error: 'Internal server error', details: String(err) })
+  }
+})
 
 router.get('/status', function(req, res) {
   res.json({ status: 'ok' });
