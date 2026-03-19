@@ -173,7 +173,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
       };
 
     response = await aiClient.models.generateContent({
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash-lite",
       contents: receiptInfoContents,
       config: receiptInfoConfig,
     });
@@ -259,7 +259,7 @@ router.post('/analyzeReceipt', upload.single('file'), async function(req, res) {
   let categoryResponse;
   try {
     categoryResponse = await aiClient.models.generateContent({
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash-lite",
       contents: itemCategoryContents,
       config: itemCategoryConfig,
     });
