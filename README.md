@@ -1,4 +1,6 @@
 # Receipt-Budgeter
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmasoncfrancis%2Freceipt-budgeter.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmasoncfrancis%2Freceipt-budgeter?ref=badge_shield)
+
 
 A small web app that analyzes receipt images, suggests budget categories for items using an LLM, and integrates with the Actual Budget API. The repository contains a Vite + React client (`client/`) and an Express server (`server/`).
 
@@ -132,3 +134,7 @@ npx serve -s dist
 
 ## Contributing
 - Bug reports and PRs welcome. Follow the existing code style and keep changes minimal and focused.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmasoncfrancis%2Freceipt-budgeter.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmasoncfrancis%2Freceipt-budgeter?ref=badge_large)
