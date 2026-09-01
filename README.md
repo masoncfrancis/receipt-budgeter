@@ -30,6 +30,7 @@ Server environment variables (put in `server/.env.local` or export in your shell
 - `ACTUAL_SERVER_URL` : (required) URL to your Actual API server
 - `ACTUAL_PASSWORD` : Password for Actual API (if required by your Actual server)
 - `PORT` : Port for Express to listen on (server defaults to `3010` if not provided)
+- `SENTRY_DSN` : (optional) Sentry DSN for backend error and log capture
 - `ALLOW_ANONYMOUS` : (optional) If `true`, allows anonymous access without authentication (default: `false`)
 
 Client environment variables (Vite — put in `client/.env` or `client/.env.local`):
@@ -50,6 +51,7 @@ ACTUAL_BUDGET_FILE_ID=12345abcdef
 ALLOW_ANONYMOUS=false
 NODE_ENV=production
 PORT=3010
+SENTRY_DSN=https://your-sentry-dsn@o0.ingest.sentry.io/0
 ```
 
 Example `client/.env` (Vite):
